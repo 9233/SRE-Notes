@@ -1,0 +1,146 @@
+ELK日志分析平台部署
+
+目标：
+
+N个手机端app，发送手机日志，传给logstash，经过清洗过滤后　Output给elasticsearch，然后kibana进行数据的实时分析，展现。
+
+
+elasticsearch-5.6.3 　　　　es1    　　　　192.168.165.28       CentOS 7.3
+elasticsearch-5.6.3 　　　　es2    　　　　192.168.165.33       CentOS 7.3
+elasticsearch-5.6.3 　　　　es3    　　　　192.168.165.27       CentOS 7.3
+logstash-5.6.3      　　　 logstash 　　192.168.165.28       CentOS 7.3
+kibana-5.6.3-x86_64 　　　 kibana   　　192.168.165.28       CentOS 7.3
+filebeat-5.6.3-x86_64　　　filebeat   192.168.165.33       CentOS 7.3
+    
+一：　elasticsearch集群部署
+1.官网下载rpm包安装
+rpm -ivh elasticsearch-5.6.3.rpm
+
+2. 编辑配置文件
+# vim /etc/elasticsearch/elasticsearch.yml
+============================
+cluster.name: ELK
+node.name: es-1
+network.host: 192.168.165.28
+discovery.zen.ping.unicast.hosts: ["192.168.165.28", "192.168.165.33","192.168.165.27"]
+=====注意不同node　name,ip不同===
+
+3. 启动服务
+
+# systemctl daemon-reload 
+# systemctl start elasticsearch 
+# systemctl status elasticsearch
+# systemctl enable elasticsearch
+
+4.
+查询集群状态方法
+#curl -XGET 'http://192.168.165.28:9200/_cat/nodes'
+# curl -XGET 'http://192.168.165.28:9200/_cat/nodes?v'
+curl -XGET 'http://192.168.165.28:9200/_cluster/state/nodes?pretty'
+查询集群中的master
+curl -XGET 'http://192.168.165.28:9200/_cluster/state/master_node?pretty'
+查询集群的健康状态
+curl -XGET 'http://192.168.165.28:9200/_cat/health?v'
+
+至此，ES集群安装结束。
+
+
+二：部署Logstash
+
+1.官网下载rpm包安装
+rpm -ivh logstash-5.6.3.rpm
+
+2.增加配置文件,python格式注意缩进等
+#cd /etc/logstash/conf.d/
+vim logstash.conf 
+======新增配置文件logstash.conf,文件名可自己定义======
+input{
+  beats{
+    port => 5044
+  }
+}
+output{
+  elasticsearch{
+    hosts => "192.168.165.28:9200"
+    manage_template => false
+    index => "%{[@metadata][beat]}-%{+YYYY.MM.dd}"
+    document_type => "%{[@metadata][type]}"
+  }
+}
+================================================
+
+
+systemctl start logstash
+
+ss -tnl
+
+5044端口已经启动，至此，Logstash安装配置完成。
+
+
+三　部署kibana
+
+1.官网下载rpm包安装
+rpm -ivh kibana-5.6.3-x86_64.rpm
+2. 编辑配置文件
+#vim /etc/kibana/kibana.yml 　　　　//变更如下
+
+================
+
+server.host: "192.168.165.28"
+elasticsearch.url: "http://192.168.165.28:9200"
+
+============
+3. 启动kibana
+systemctl start kibana
+systemctl enable kibana
+ss -tnl
+
+5601端口已经开启。
+4.
+浏览器登录kibana
+http://192.168.165.28:5601
+初始化需要重建索引。稍后我们选择基于filebeat-* 和　@timestamp　的索引。
+至此，Kibana安装配置完成。
+
+
+
+四　Fliebeat-客户端收集Log测试
+
+1.官网下载rpm包安装
+rpm -ivh filebeat-5.6.3-x86_64.rpm
+
+2. 编辑配置文件
+#vi /etc/filebeat/filebeat.yml
+
+============修改下面相关配置==========
+paths:
+    - /var/log/httpd/access_log
+
+
+
+output.logstash:
+    hosts:["192.168.165.28:5044"]
+
+===============================
+
+3. 启动filebeat
+systemctl start filebeat
+
+4. 浏览器登录Kibana
+http://192.168.165.28:5601
+初始化需要重建索引。我们选择基于filebeat-* 模式和　@timestamp　的索引。点击创建。
+可以看到从filebeat客户端Server实时传过来的日志信息
+
+至此，ELK环境部署完成。
+
+ref:
+
+https://www.elastic.co/downloads
+http://www.cnblogs.com/ding2016/p/6879584.html
+http://www.cnblogs.com/ding2016/p/6885499.html
+http://www.cnblogs.com/ding2016/p/6885983.html
+http://www.cnblogs.com/ding2016/p/6886451.html
+
+kibana [kɪbana]
+logstash [lɔɡ] [stɑ:ʃ]
+elasticseach [ɪˈlæstɪk] [sɜːtʃ]
