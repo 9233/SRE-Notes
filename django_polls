@@ -1,0 +1,62 @@
+django　投票系统开发
+
+目标：　掌握django　基于ｍｖｔ架构的　templates views urls开发，　基本的项目设置，命令。
+
+1.基础环境搭建与安装django
+pip install virtualenv
+virtualenv django111
+#cd /data/www/django111
+#source ./bin/activate
+deactivate
+
+#django-admin startproject mypolls
+#python manage.py startapp polls
+
+
+
+2.数据库创建与模型设计，导入等
+
+#vi polls/models.py
+============================================
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import models
+
+# Create your models here.
+import datetime
+from django.utils import timezone
+
+
+class Question(models.Model):
+    question_text = models.CharField(max_length=200)
+    pub_date = models.DateTimeField('date published')
+    def __str__(self):
+        return self.question_text
+    def was_published_recently(self):
+        return self.pub_date >= timezone.now() - datetime.timedelta(days=1)
+
+
+
+
+class Choice(models.Model):
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    choice_text = models.CharField(max_length=200)
+    votes = models.IntegerField(default=0)
+    def __str__(self):
+        return self.choice_text
+
+=================
+
+=====数据库设置＝＝＝＝＝＝＝＝＝＝＝＝
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'django_polls',
+        'USER': 'root',
+        'PASSWORD': 'Aa***',
+        'HOST': '127.0.0.1',
+        'PORT': '3306',
+    }
+}
+=================
