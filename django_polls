@@ -263,3 +263,6 @@ Vote again?
 https://docs.djangoproject.com/en/1.11/
 http://usyiyi.cn/translate/Django_111/contents.html
 https://www.cnblogs.com/fnng/p/4855743.html
+
+ＦＡＱ：
+官方文档非常详细了，但是跟着做完之后发现没有ｃｈｏｉｃｅ内容。注意ｃｈｏｉｃｅ内容是在　api那添加的，后面添加可以在ａｄｍｉｎ后台添加
