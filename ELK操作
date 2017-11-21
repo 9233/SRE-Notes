@@ -1,0 +1,217 @@
+======新建索引=========
+
+curl -XPUT http://192.168.165.28:9200/shakespeare -d '
+{
+ "mappings" : {
+  "_default_" : {
+   "properties" : {
+    "speaker" : {"type": "string", "index" : "not_analyzed" },
+    "play_name" : {"type": "string", "index" : "not_analyzed" },
+    "line_id" : { "type" : "integer" },
+    "speech_number" : { "type" : "integer" }
+   }
+  }
+ }
+}
+';
+
+=====
+curl -XPUT http://192.168.165.28:9200/logstash-2015.05.18 -d '
+{
+  "mappings": {
+    "log": {
+      "properties": {
+        "geo": {
+          "properties": {
+            "coordinates": {
+              "type": "geo_point"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+';
+curl -XPUT http://192.168.165.28:9200/logstash-2015.05.19 -d '
+{
+  "mappings": {
+    "log": {
+      "properties": {
+        "geo": {
+          "properties": {
+            "coordinates": {
+              "type": "geo_point"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+';
+curl -XPUT http://192.168.165.28:9200/logstash-2015.05.20 -d '
+{
+  "mappings": {
+    "log": {
+      "properties": {
+        "geo": {
+          "properties": {
+            "coordinates": {
+              "type": "geo_point"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+';
+
+
+====导入数据========
+
+
+curl -XPOST 'http://192.168.165.28:9200/bank/account/_bulk?pretty' --data-binary @accounts.json
+curl -XPOST 'http://192.168.165.28:9200/shakespeare/_bulk?pretty' --data-binary @shakespeare.json
+curl -XPOST 'http://192.168.165.28:9200/_bulk?pretty' --data-binary @logs.jsonl
+
+
+====删除数据========
+
+curl -XDELETE 'http://192.168.165.28:9200/exceptionLog_usertest'
+curl -XDELETE 'http://192.168.165.28:9200/exceptionLog_heartbeat'
+curl -XDELETE 'http://192.168.165.28:9200/exceptionLog_heartbeat_report'
+
+curl -XDELETE 'http://192.168.165.28:9200/exceptionlog_tarzan'
+
+
+====查询全部索引====
+curl 'http://192.168.165.28:9200/_cat/indices?v'
+
+
+========================
+user => 'elastic'
+password => 'changeme'
+xpack.monitoring.elasticsearch.url: "http://192.168.*.*:9200" 
+xpack.monitoring.elasticsearch.username: "logstash_system" 
+xpack.monitoring.elasticsearch.password: "changeme"
+===============
+
+选择 ba* 的索引模式，并 query 栏中输入一下的查询字符串。
+
+account_number:<100 AND balance:>47500
+
+这个查询返回的结果是 : 在 0～99之间并且余额超过 47,500 美元的账户会员。
+
+当搜索 bank 的样本数据时，它返回的 5 结果 :  账户会员 8，32，78，85 和 97。
+
+默认情况下，会为每一个匹配文件显示所有的字段。要选择想要显示的文档字段，请将鼠标悬停在可用的字段列表上，然后点击你想要包含的字段旁边的 add 按钮。
+
+例如 : 如果你只添加 account_number 字段，那么显示将会改为一个包含 5 个 account numbers（会员账户）的简单列表 : 
+
+
+查询语法：
+字段:"字符串"
+
+
+
+http://cwiki.apachecn.org/pages/viewpage.action?pageId=2163133
+http://cwiki.apachecn.org/
+
+
+http://blog.csdn.net/spring_ming/article/details/70224598
+
+http://blog.csdn.net/jefferyqjy/article/details/72869241
+
+
+
+
+
+========ELK分别安装三次X-Pack=============
+
+/usr/share/elasticsearch/bin/elasticsearch-plugin install file:///path/to/file/x-pack-5.6.3.zip
+
+=============================
+
+
+
+使用官方logstash jdbc input插件同步mysql数据到elastic中
+
+１．　安装logstash jdbc input插件
+
+
+/usr/share/logstash/bin/plugin install logstash-input-jdbc
+
+==============document_id => "%{testid}"避免数据重复==============
+input {
+    jdbc {
+      type => "tarzan"
+      # mysql jdbc connection string to our backup databse
+      jdbc_connection_string => "jdbc:mysql://192.168.164.1:3306/dbname"
+      # the user we wish to excute our statement as
+      jdbc_user => "root"
+      jdbc_password => "***"
+      # the path to our downloaded jdbc driver
+      jdbc_driver_library => "/usr/share/logstash/mysql-connector-java-5.1.44-bin.jar"
+      # the name of the driver class for mysql
+      jdbc_driver_class => "com.mysql.jdbc.Driver"
+      jdbc_paging_enabled => "true"
+      jdbc_page_size => "1000"
+      statement => "select * from tbl_tarzan"
+      schedule => "* * * * *"
+      #　分　时　日　月　周
+    }
+}
+output {
+   if [type] == "Etarzan" {
+    elasticsearch {
+        hosts  => "192.168.165.28:9200"
+        index => "tarzan"
+        document_type => "tarzan"
+        document_id => "%{testid}"
+        user => "elastic"
+        password => "changeme"
+    }
+   }
+}
+
+
+
+=======
+input {
+    jdbc {
+      type => "heartbeat"
+      # mysql jdbc connection string to our backup databse
+      jdbc_connection_string => "jdbc:mysql://192.168.164.1:3306/feedbackdb_test?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull"
+      # the user we wish to excute our statement as
+      jdbc_user => "root"
+      jdbc_password => "***"
+      # the path to our downloaded jdbc driver
+      jdbc_driver_library => "/usr/share/logstash/mysql-connector-java-5.1.44-bin.jar"
+      # the name of the driver class for mysql
+      jdbc_driver_class => "com.mysql.jdbc.Driver"
+      jdbc_paging_enabled => "true"
+      jdbc_page_size => "1000"
+      statement => "select * from tbl_heartbeat"
+      schedule => "59 * * * *"
+    }
+}
+output {
+   if [type] == "heartbeat" {
+    elasticsearch {
+        hosts  => "192.168.165.*:9200"
+        index => "heartbeat"
+        document_type => "heartbeat"
+        document_id => "%{heartbeat_id}"
+        user => "elastic"
+        password => "changeme"
+    }
+   }
+}
+
+
+
+==============
+
+参见：https://www.elastic.co/blog/logstash-jdbc-input-plugin
