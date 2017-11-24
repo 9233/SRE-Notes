@@ -1,0 +1,32 @@
+新加编译服务器复制jenkins环境
+
+１．拷贝　/home/android/apache-tomcat
+
+rsync -avzP /home/android/apache-tomcat/ android@192.168.160.5:/home/android/apache-tomcat/
+
+　拷贝　/home/android/jenkins_home
+ 
+ 注意排除jobs/*/workspace*目录下大量的版本文件
+ rsync -avzP /home/android/jenkins_home/ --exclude jobs/*/workspace*/ android@192.168.160.5:/home/android/jenkins_home/
+ 
+ 
+ 2.新的server
+ vi /home/android/.bashrc
+ 
+确认系统是java　１．８环境
+
+#export JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64 
+export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
+export JRE_HOME=${JAVA_HOME}/jre
+export CLASSPATH=.:${JAVA_HOME}/lib:${JRE_HOME}/lib
+export PATH=${JAVA_HOME}/bin:$PATH
+export PATH=${PATH}:~/sdk/platform-tools/:~/sdk/tools/
+
+
+ 
+尾行添加环境变量 
+export JENKINS_HOME=/home/android/jenkins_home
+export PATH=$JENKINS_HOME:$PATH
+
+启动tomcat
+http://192.168.*.*:8080/jenkins/
