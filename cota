@@ -1,0 +1,57 @@
+1.新建 cota　数据库
+2.搭建nginx php php-mysql环境
+3.修改 nginx　配置文件
+
+server {
+        listen       80;
+        server_name  127.0.0.1;
+            location / {
+            #root   /data/tools/repository/nginx-1.4.4/html/feedback;
+            #root   /data/feedback_code/feedback;
+
+           root   /data/cota/frontend/web;
+              index  index.html index.htm index.php;
+                if (!-e $request_filename){
+                        rewrite ^/(.*) /index.php last;
+                }
+            }
+       large_client_header_buffers 4 16k;
+       client_max_body_size 30m;
+       client_body_buffer_size 128k;
+       location ~ \.php$ {
+            #root           /data/tools/repository/nginx-1.4.4/html/feedback;
+           # root           /data/feedback_code/feedback;
+            root           /data/cota/frontend/web;
+
+            #fastcgi_pass   127.0.0.1:9000;
+            fastcgi_pass unix:/var/run/php5-fpm.sock;
+            fastcgi_index  index.php;
+            #fastcgi_param  SCRIPT_FILENAME  /data/tools/repository/nginx-1.4.4/html/feedback$fastcgi_script_name;
+            #fastcgi_param  SCRIPT_FILENAME  /data/feeedback_code/feedback$fastcgi_script_name;
+            fastcgi_param  SCRIPT_FILENAME  /data/cota/frontend/web$fastcgi_script_name;
+             fastcgi_connect_timeout 300;
+            fastcgi_read_timeout 300;
+            fastcgi_send_timeout 300;
+            fastcgi_buffer_size 64k;
+            fastcgi_buffers   4 32k;
+            fastcgi_busy_buffers_size 64k;
+            fastcgi_temp_file_write_size 64k;
+            include        fastcgi_params;
+            chunked_transfer_encoding       on;
+            gzip  off;
+        }
+}
+
+4.前台　后台配置类似。
+
+5.修改　common 的mysql数据库连接配置文件
+
+(关于/cota/data/cota_data等目录的常量　的意义，有待观察)
+
+6.
+cd /data/cota/
+php init
+初始化yii.
+
+7.
+访问http://127.0.0.1
