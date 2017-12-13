@@ -1,0 +1,129 @@
+概述：
+主机名 	 IP地址 	       系统版本 	        模块角色
+bk1 	192.168.165.250 	CentOS7 	nginx,appt,rabbitmq,kafka,zk,es,bkdata,consul,fta
+bk2 	192.168.165.251 	CentOS7 	license,appo,kafka,zk,es,mysql,beanstalk,consul
+bk3 	192.168.165.252 	CentOS7 	paas,cmdb,job,gse,kafka,zk,es,consul,redis
+
+蓝鲸3.0基于Django 1.8开发集成了elasticsearch,zookeeper,rabbitmq,ngxin等众多服务，至少需要３台服务器，完成部署。
+操作系统仅支持CentOS，服务器配置至少四核８Ｇ。
+主机环境要求：
+1.所有机器之间保证内网络可以 SSH 免密登陆
+2.关闭 SELinux，保证机器相互之间的互通 (可以在安装完成后再根据服务所需策略添加防火墙规则)
+3.安装过程中, 需要保证所有机器可以使用 http、https 连接到 Internet，若无法做到，可以自建一个 yum 源以及 pip 源
+4.若 pip 源无法自建， 可以参考 安装步骤——准备工作——3准备配置文件 中的方法解决
+5.操作系统使用 CentOS 7.0~ CentOS 7.3，并可以使用 yum 进行安装服务。 配置好可用的 yum 源，建议使用网易、搜狐等镜像源
+6.若添加了自定义的 yum 源, 需要保证 /etc/yum.conf.d/Base.repo 中的 yum 源指定的操作系统版本号与 CentOS 发行版的大版本号一致.
+7.使用 CentOS 6.X 安装会出现 rabbitmq 安装或启动失败，若无法升级 CentOS7，也可以在安装使用部署脚本安装 rabbitmq 启动失败后，手动安装rabbitmq，并替换 rabbitmq，erlang 相关的程序文件
+8.操作系统上必须先安装好开发工具套件, 可以使用如下命令安装：yum -y groupinstall "Development Tools"
+
+
+
+一：下载安装包
+
+https://bk.tencent.com/download/
+1. src 版本包  当前版本：3.1.7
+2. install 安装脚本  当前版本：1.0.15 
+3.ssl证书下载，输入三台安装机器的mac地址,用分号隔开
+08:00:27:6a:de:cb;08:00:27:5c:a7:8f;08:00:27:08:7f:9d
+
+
+二：安装前准备工作：
+在三台服务器上分别执行：
+yum update
+yum install epel-release -y
+yum install java-1.8.0-openjdk.x86_64 -y
+yum install python2-pip -y
+yum -y groupinstall "Development Tools"
+
+sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+systemctl stop firewalld.service
+systemctl disable firewalld.service
+
+
+systemctl status　NetworkManager.service
+systemctl stop NetworkManager.service
+systemctl disable NetworkManager.service
+
+＝＝中控机到集群的ssh免密码登录设置＝＝＝＝
+ssh-keygen -t rsa
+scp .ssh/id_rsa.pub root@192.168.165.252:/root
+cat id_rsa.pub > .ssh/authorized_keys
+＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
+===设置系统时间保证服务器集群时间同步＝＝＝
+yum -y install ntp
+systemctl enable ntpd
+systemctl start ntpd
+ntpdate -u cn.pool.ntp.org
+cp -f /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+date
+hwclock -w
+＝＝＝＝＝＝＝＝＝＝＝＝＝＝
+
+==加入三台服务器的/etc/hosts==
+192.168.165.250 tinno-sh.com
+192.168.165.250 paas.tinno-sh.com
+192.168.165.250 jobs.tinno-sh.com
+192.168.165.250 cmdb.tinno-sh.com
+===
+
+
+＝＝＝虚拟机双网卡需要删除这条默认路由，不然上不了网＝＝＝＝
+ip route show
+ip route del 192.168.164.0/23
+＝＝＝＝＝＝＝
+
+
+
+三：安装步骤：
+
+$ cd /data
+$ tar xf bkce_src-3.1.6.tgz
+$ tar xf install_ce-1.0.14.tgz
+$ cd src/cert
+$tar xf　ssl_certificates.tar.gz
+$ cd ../../install
+
+
+====    $ vi install.config====
+192.168.165.250 nginx,appt,rabbitmq,kafka,zk,es,bkdata,consul,fta
+192.168.165.251 license,appo,kafka,zk,es,mysql,beanstalk,consul
+192.168.165.252 paas,cmdb,job,gse,kafka,zk,es,consul,redis,bkarchiva
+====
+Note:
+1. zk 表示 zookeeper， es 表示 elasticsearch
+2. 该配置文件，要保证逗号前后没有空白字符，行末没有空白字符， ip 后面使用空格与服务名称隔开(不能使用 tab )
+3. 含有多个内网 ip 的机器，install。config 中使用 /sbin/ifconfig 输出中的第一个内网ip
+4. 在 ip 后面写上该机器要安装的服务列表即可。
+5. nginx 与 cmdb 不能部署在同一台机器
+6. gse 与redis 需要部署在同一台机器上
+7. 安装 zk 的机器， 不能有外网IP， 或者必须通过防火墙策略限制zk端口的访问
+8. gse 若需要跨云支持， gse 所在机器必须有外网 IP
+9. 增加机器数量时， 可以将以上配置中的服务挪到新的机器上。 要保证: kafka， es， zk 的每个组件的总数量为3
+
+
+===vi globals.env==
+修改各种账户和密码
+
+$ ./bk_install base_service  # 安装基础环境
+$ ./bk_install bk_products  # 安装蓝鲸主要产品，并初始化数据
+# 该步骤安装完成后，可以通过浏览器打开蓝鲸了。cmdb，job 都应该能访问才算是正常
+$ ./bk_install app_mgr        # 安装 开发者中心的 App 管理器
+# 该步骤安装完成后， 可以在开发者中心的 服务器信息 和 第三方服务信息 中看到已经成功激活的服务器
+$ ./bk_install gse_agent    # 在所有机器上安装 gse_agent
+# 该步骤安装完成后，可以在 CC 的资源池中看到安装蓝鲸的服务器 ip 列表
+
+
+错误调试：
+./bkcec start consul　启动服务
+./bkcec status consul查看服务状态　
+
+start job失败：
+设置三台服务器　/etc/resove.conf 加入
+ nameserver 127.0.0.1
+
+
+
+参考文档：
+
+http://bbs.bk.tencent.com/forum.php?mod=forumdisplay&fid=79
+ＱＱ群：　495299374
