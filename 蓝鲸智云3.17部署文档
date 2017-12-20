@@ -1,8 +1,10 @@
+
+＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 概述：
 主机名 	 IP地址 	       系统版本 	        模块角色
 bk1 	192.168.165.250 	CentOS7 	nginx,appt,rabbitmq,kafka,zk,es,bkdata,consul,fta
-bk2 	192.168.165.251 	CentOS7 	license,appo,kafka,zk,es,mysql,beanstalk,consul
-bk3 	192.168.165.252 	CentOS7 	paas,cmdb,job,gse,kafka,zk,es,consul,redis
+bk2 	192.168.162.190 	CentOS7 	license,appo,kafka,zk,es,mysql,beanstalk,consul
+bk3 	192.168.162.191 	CentOS7 	paas,cmdb,job,gse,kafka,zk,es,consul,redis
 
 蓝鲸3.0基于Django 1.8开发集成了elasticsearch,zookeeper,rabbitmq,ngxin等众多服务，至少需要３台服务器，完成部署。
 操作系统仅支持CentOS，服务器配置至少四核８Ｇ。
@@ -24,31 +26,38 @@ https://bk.tencent.com/download/
 1. src 版本包  当前版本：3.1.7
 2. install 安装脚本  当前版本：1.0.15 
 3.ssl证书下载，输入三台安装机器的mac地址,用分号隔开
-08:00:27:6a:de:cb;08:00:27:5c:a7:8f;08:00:27:08:7f:9d
+
+
+08:00:27:df:ff:7d;08:00:27:e8:5a:30;08:00:27:60:ef:92
+
+
 
 
 二：安装前准备工作：
 在三台服务器上分别执行：
 yum update
+
+yum install net-tools -y
 yum install epel-release -y
 yum install java-1.8.0-openjdk.x86_64 -y
 yum install python2-pip -y
 yum -y groupinstall "Development Tools"
 
 sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
-systemctl stop firewalld.service
-systemctl disable firewalld.service
 
+systemctl stop firewalld.service && systemctl disable firewalld.service
 
-systemctl status　NetworkManager.service
-systemctl stop NetworkManager.service
-systemctl disable NetworkManager.service
+===禁用后管理ip图形界面消失========
+systemctl stop NetworkManager.service && systemctl disable NetworkManager.service
+===禁用后管理ip图形界面消失========
 
 ＝＝中控机到集群的ssh免密码登录设置＝＝＝＝
 ssh-keygen -t rsa
-scp .ssh/id_rsa.pub root@192.168.165.252:/root
+scp ~/.ssh/id_rsa.pub root@192.168.165.252:/root
 cat id_rsa.pub > .ssh/authorized_keys
 ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
+
+
 ===设置系统时间保证服务器集群时间同步＝＝＝
 yum -y install ntp
 systemctl enable ntpd
@@ -66,22 +75,30 @@ hwclock -w
 192.168.165.250 cmdb.tinno-sh.com
 ===
 
+==加入三台服务器的/etc/resove.conf==
+nameserver 127.0.0.1
+===
+
+
+
 
 ＝＝＝虚拟机双网卡需要删除这条默认路由，不然上不了网＝＝＝＝
 ip route show
 ip route del 192.168.164.0/23
+
+route del default gw 0.0.0.0
 ＝＝＝＝＝＝＝
 
 
 
 三：安装步骤：
 
-$ cd /data
-$ tar xf bkce_src-3.1.6.tgz
-$ tar xf install_ce-1.0.14.tgz
-$ cd src/cert
-$tar xf　ssl_certificates.tar.gz
-$ cd ../../install
+cd /data
+tar xf bkce_src-3.1.7.tgz
+tar xf install_ce-1.0.15.tgz
+cd src/cert
+tar xf ssl_certificates.tar.gz
+cd ../../install
 
 
 ====    $ vi install.config====
@@ -104,14 +121,16 @@ Note:
 ===vi globals.env==
 修改各种账户和密码
 
-$ ./bk_install base_service  # 安装基础环境
-$ ./bk_install bk_products  # 安装蓝鲸主要产品，并初始化数据
-# 该步骤安装完成后，可以通过浏览器打开蓝鲸了。cmdb，job 都应该能访问才算是正常
-$ ./bk_install app_mgr        # 安装 开发者中心的 App 管理器
-# 该步骤安装完成后， 可以在开发者中心的 服务器信息 和 第三方服务信息 中看到已经成功激活的服务器
-$ ./bk_install gse_agent    # 在所有机器上安装 gse_agent
+./bk_install base_service  # 安装基础环境
+./bk_install bk_products  # 安装蓝鲸主要产品，并初始化数据 该步骤安装完成后，可以通过浏览器打开蓝鲸了。cmdb，job 都应该能访问才算是正常
+./bk_install app_mgr        # 安装 开发者中心的 App 管理器 该步骤安装完成后， 可以在开发者中心的 服务器信息 和 第三方服务信息 中看到已经成功激活的服务器
+./bk_install gse_agent    # 在所有机器上安装 gse_agent
 # 该步骤安装完成后，可以在 CC 的资源池中看到安装蓝鲸的服务器 ip 列表
 
+
+./bkcec start consul
+./bkcec start all
+./bkcec status all
 
 错误调试：
 ./bkcec start consul　启动服务
@@ -127,3 +146,134 @@ start job失败：
 
 http://bbs.bk.tencent.com/forum.php?mod=forumdisplay&fid=79
 ＱＱ群：　495299374
+
+
+=================
+http://bk.tencent.com/document/bkprod/000119.html
+http://bbs.bk.tencent.com/forum.php?mod=viewthread&tid=505&extra=page%3D1
+
+============
+客户机安装 Agent
+curl -s http://192.168.165.250/download/direct/install_agent.sh| bash
+＝＝＝＝＝＝＝＝＝＝＝
+./bkcec start consul
+./bkcec start all
+
+./bkcec start all　启动服务
+./bkcec status all
+
+
+./bkcec sync all
+./bkcec install paas 1
+
+===========================================
+
+192.168.165.250 nginx,kafka,zk,es,consul
+192.168.162.190 license,appo,kafka,zk,es,mysql,beanstalk,consul
+192.168.162.191 paas,cmdb,job,gse,kafka,zk,es,consul,redis,bkarchiva,bkdata,fta,appt,rabbitmq
+
+
+
+＝＝＝＝＝以下是搭建本地django1.8开发环境，仅供参考＝＝＝＝＝＝＝＝
+root  QWERT12345*#
+
+android  QWE123*#
+
+ubuntu 14.0
+apt-get install vagrant
+
+
+vagrant --version
+VBoxManage --version #Virtualbox管理工具
+ssh -V
+
+Vagrant 需要基础镜像才能使用，蓝鲸已经制作好了应用开发镜像，里面包含了 Mysql、 Rabbit-MQ、django 等应用开发所需的环境，即开即用。
+
+wget http://bkopen-10032816.file.myqcloud.com/paas/bk-django1.8-u2.box
+
+使用命令添加镜像到 Vagrant
+
+vagrant box add bk bk-django1.8.box
+vagrant init bk #初始vagrant，bk为上面添加的名字
+vagrant up #启动环境
+vagrant ssh #登录环境
+
+
+CREATE DATABASE IF NOT EXISTS app_code DEFAULT CHARSET utf8 COLLATE utf8_general_ci;
+
+=======================
+源码服务器CentOS　
+
+192.168.162.191
+用户名 root
+密码　123
+
+paas 集中登录认证界面：　
+/data/bkce/open_paas
+
+
+job作业平台界面:
+/data/bkce/job/job
+
+cmdb配置平台界面: 
+/data/bkce/cmdb/cmdb　
+
+
+所有平台数据库：
+ssh root@192.168.162.190
+密码:Aa123456
+
+mysql -uroot -h 192.168.162.190 -p
+Aa123456
+
+
+
+===========
+vi /etc/profile
+
+http_proxy="http://192.168.164.1:3128"
+https_proxy="http://192.168.164.1:3128"
+export http_proxy
+export https_proxy
+
+source /etc/profile
+
+
+＝＝＝＝＝＝＝＝＝＝＝＝＝
+
+
+本地开发环境安装
+1.本地环境搭建镜像 点击下载
+2.使用文档 点击下载
+
+注意：应用测试、正式部署时会自动安装运行环境，并部署应用
+2
+开发项目
+1.配置修改
+（1）conf/default.py 文件：APP_ID \ APP_TOKEN （蓝鲸智云开发者中心 -> 点击应用ID -> 基本信息 中可以查看到这两个值的信息）
+（2）conf/default.py 文件：BK_PAAS_HOST（蓝鲸智云开发者中心的域名，形如：http://paas.bking.com）
+（3）conf/settings_development.py 文件：DATABASES（请创建本地开发数据库，并修改配置信息）
+（4）conf/settings_testing.py 文件：DATABASES（请创建测试数据库，并修改配置信息）
+（5）conf/settings_production.py 文件：DATABASES（请创建正式数据库，并修改配置信息）
+
+注意：测试环境 和 正式环境 的数据库需要对 AppServer 授权
+
+2.celery 配置
+若需要使用 celery，请修改以下配置：（点击下载 celery 开发指引）
+（1）conf/default.py 文件：IS_USE_CELERY 的值设置为: True
+（2）conf/default.py 文件：BROKER_URL_DEV（请创建本地开发的 celery消息队列，并修改配置信息，推荐使用 RabbitMQ）
+（3）conf/default.py 文件：CELERY_IMPORTS（添加celery任务模块）
+3.数据库操作
+Django1.8 Migration的使用方法如下:
+（1）执行 manage.py migrate（Django默认表创建）。
+（2）执行 manage.py startapp yourappname、添加yourappname到conf/default.py文件的"INSTALLED_APPS_CUSTOM"变量中。
+（3）在Application的models.py中建立数据库模型，执行manage.py makemigrations yourappname。
+（4）执行manage.py migrate yourappname。
+3
+部署项目
+通过蓝鲸智云开发者中心提供的“测试部署”、“正式部署”服务将应用部署到测试\正式环境中。
+操作入口：蓝鲸智云开发者中心 -> 点击应用名称 -> 应用部署。
+（1）测试部署：将应用代码在测试环境上进行部署，部署成功后就可以在测试环境中使用您的应用。
+（2）正式部署：将应用代码在正式环境上进行部署，部署成功后就可以在正式环境中使用您的应用。
+（3）下架操作：系统将应用代码从您选择的环境上撤销部署，届时用户将无法访问该应用，但是该应用的数据库依然保留。
+
