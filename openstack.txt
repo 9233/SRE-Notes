@@ -1,0 +1,16 @@
+Summary for the impatient
+
+If you are using non-English locale make sure your /etc/environment is populated:
+
+LANG=en_US.utf-8
+LC_ALL=en_US.utf-8
+
+
+On CentOS:
+
+$ sudo yum install -y centos-release-openstack-pike
+$ sudo yum update -y
+$ sudo yum install -y openstack-packstack
+$ sudo packstack --allinone
+
+http://openstack.redhat.com/install/packstack/
