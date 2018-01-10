@@ -1,0 +1,102 @@
+1.下载对应版本的x-pack：
+wget 'https://artifacts.elastic.co/downloads/packs/x-pack/x-pack-5.6.3.zip
+
+2.安装
+./elasticsearch-5.6.3/bin/elasticsearch-plugin install file:///root/elk/xpack/x-pack-5.6.3.zip
+
+./kibana-5.6.3-linux-x86_64/bin/kibana-plugin install file:///root/elk/elk/xpack/x-pack-5.6.3.zip
+
+默认账号密码：
+
+用户名：elastic
+密码：changeme  
+
+查看当前证书
+curl 'http://192.168.165.28:9200/_license'
+{
+  "license" : {
+    "status" : "active",
+    "uid" : "25198237-3793-4d19-93bf-e9d458ce526b",
+    "type" : "basic",
+    "issue_date" : "2017-12-11T00:00:00.000Z",
+    "issue_date_in_millis" : 1512950400000,
+    "expiry_date" : "2018-12-11T23:59:59.999Z",
+    "expiry_date_in_millis" : 1544572799999,
+    "max_nodes" : 100,
+    "issued_to" : "taishan yuan (QQ)",
+    "issuer" : "Web Form",
+    "start_date_in_millis" : 1512950400000
+  }
+}
+
+===开始破解：===
+
+vi LicenseVerifier.java
+
+####内容开始####
+package org.elasticsearch.license;
+
+import java.nio.*;
+import java.util.*;
+import java.security.*;
+import org.elasticsearch.common.xcontent.*;
+import org.apache.lucene.util.*;
+import org.elasticsearch.common.io.*;
+import java.io.*;
+
+public class LicenseVerifier
+{
+    public static boolean verifyLicense(final License license, final byte[] encryptedPublicKeyData) {
+        return true;
+    }
+
+    public static boolean verifyLicense(final License license) {
+        return true;
+    }
+}
+####内容结束####
+
+javac -cp "/usr/share/elasticsearch/lib/elasticsearch-5.6.3.jar:/usr/share/elasticsearch/lib/lucene-core-6.6.1.jar:/usr/share/elasticsearch/plugins/x-pack/x-pack-5.6.3.jar" LicenseVerifier.java
+
+
+jar -xvf x-pack-5.6.3.jar
+替换 LicenseVerifier.class 文件
+rm -rf org/elasticsearch/license/LicenseVerifier.class
+cp ../LicenseVerifier.class org/elasticsearch/license/
+
+重新打包
+jar -cvf x-pack-5.6.3.jar ./*
+
+
+#覆盖plugins文件夹里面的jar包
+mv x-pack-5.6.3.jar /usr/share/elasticsearch/plugins/x-pack/
+
+
+申请license（访问网站：https://license.elastic.co/registration）：
+
+修改白金版本20年使用权
+"type":"platinum"
+"expiry_date_in_millis":253395907200000
+
+
+vi tarzan-yuan-6e625a7e-d9d1-4bf7-b3a5-e329958992f1-v5.json 
+curl -XPUT 'http://192.168.165.28:9200/_xpack/license?acknowledge=true' -H "Content-Type: application/json" -d @tarzan-yuan-6e625a7e-d9d1-4bf7-b3a5-e329958992f1-v5.json
+
+确认破解结果
+curl -u elastic ch 'http://192.168.165.28:9200/_license'
+
+{
+  "license" : {
+    "status" : "active",
+    "uid" : "6e625a7e-d9d1-4bf7-b3a5-e329958992f1",
+    "type" : "platinum",
+    "issue_date" : "2018-01-10T00:00:00.000Z",
+    "issue_date_in_millis" : 1515542400000,
+    "expiry_date" : "9999-10-19T00:00:00.000Z",
+    "expiry_date_in_millis" : 253395907200000,
+    "max_nodes" : 100,
+    "issued_to" : "tarzan yuan (yuan)",
+    "issuer" : "Web Form",
+    "start_date_in_millis" : 1515542400000
+  }
+}
