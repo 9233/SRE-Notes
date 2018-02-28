@@ -1,0 +1,20 @@
+添加硬盘
+fdisk 只能添加2T的硬盘，
+
+3T硬盘使用 gparted
+
+关机装硬盘，
+分区
+gparted /dev/sdb
+mklebel gpt
+mkpart primary 0% 100%
+print （查看一下）
+quit 
+
+格式化
+mkfs.ext4 /dev/sdb1
+挂载
+mount /dev/sdb1 /data
+
+开机自动挂载
+/dev/sdb1               /data                 ext4    defaults        0 0
