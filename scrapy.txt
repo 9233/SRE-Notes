@@ -4,6 +4,21 @@ scrapy startproject tutorial
 scrapy genspider meiju meijutt.com
 
 
+
+
+
+scrapy startproject ArticleSpider
+scrapy genspider jobbole blog.jobbole.com
+
+
+
+
+
+
+
+
+
+
 For spiders, the scraping cycle goes through something like this:
 1.You start by generating the initial Requests to crawl the first URLs, and specify a callback function to be called with the response downloaded from those requests.
 
