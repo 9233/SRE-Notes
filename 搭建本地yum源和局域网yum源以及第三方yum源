@@ -1,0 +1,32 @@
+搭建本地yum源和局域网yum源
+mkdir -p /mnt/cdrom
+mount -o loop /soft/CentOS-7.2-Eveything-x86_64-dvd.iso /mnt/cdrom
+cd /etc/yum.repos.d/
+mv CentOS-Base.repo CentOS-Base.repo.bak
+vi CentOS-Media.repo
+修改以下两处
+baseurl=file:///mnt/cdrom/
+enabled=1
+
+本地源搭建成功,下面是基于http的网络源
+mkdir -p /var/www/html/CentOS
+mount -o loop /soft/CentOS-7.2-Eveything-x86_64-dvd.iso
+/var/www/html/CentOS
+在客户端
+cd /etc/yum.repos.d/
+vi CentOS-Base.repo
+确认baseurl正确,
+make clean all
+yum search mysql
+网络源搭建完成,基于Vsftpd与此类似.
+
+第三方yum源之 epel : https://dl.fedoraproject.org/pub/epel/7/x86_64/
+在 /etc/yum.repos.d/ 新增一名為 epel.repo 的檔案，內容填寫 [epel], name,
+baseurl, gpgcheck = 0, enabled=0 五個項目即可
+yum clean all
+yum --enablerepo epel search mysql
+
+第三方yum源之:Nux Dextop(目前已知Nux Dextop会与其他第三方库比如Repoforge和ATrpms相冲突。因此，如果你启用了除了EPEL的其他第三方库，强烈建议你将Nux Dextop仓库设置成“default
+off”（默认关闭）状态。就是用文本编辑器打开/etc/yum.repos.d/nux-dextop.repo，并且在nux-desktop下面将"enabled=1"改成 "enabled=0"。)
+rpm -Uvh http://li.nux.ro/download/nux/dextop/el7/x86_64/nux-dextop-release-0-1.el7.nux.noarch.rpm
+yum --enablerepo=nux-dextop install <package-name>
