@@ -1,9 +1,14 @@
-
 mount挂载指定用户uid的读写权限
 mount -t cifs -o rw,auto,defaults,username=elk.log,password=tinno@2018,uid=1001,gid=0 //192.168.161.8/elklog /data/
+sudo mount --bind /data/log_data /home/android/code/LogAnalyzer/log_dir
+sudo mount --bind /data/dl_data /home/android/code/LogAnalyzer/upload_log_dir
+sudo mount --bind /data/exceptionlog_dir /home/android/code/LogAnalyzer/exceptionlog_dir
 
 设置开机自动挂载
 //192.168.161.8/elklog/ /data/ cifs rw,username=elk.log,password=tinno@2018,uid=1000,gid=1000    0       0
+/data/exceptionlog_dir /home/android/code/LogAnalyzer/exceptionlog_dir none bind 0 0
+/data/dl_data /home/android/code/LogAnalyzer/upload_log_dir none bind 0 0
+/data/log_data /home/android/code/LogAnalyzer/log_dir none bind 0 0
 =====
 disabled selinux
 disabled firewall
