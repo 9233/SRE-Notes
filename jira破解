@@ -3,7 +3,96 @@ jira 6
 相关软件下载地址链接: 
 https://pan.baidu.com/s/1Ce1GIWF3dCSjf261lLkN2w 密码: nvaf
 ==========
+=======原理分析=========
+Version2LicenseDecoder类
 
+将canDecode方法改名为canDecode2，再新建一个canDecode方法，方法直接返回true；
+
+
+
+    public boolean canDecode2(String licenseString)  
+    {  
+      licenseString = removeWhiteSpaces(licenseString);  
+      
+      int pos = licenseString.lastIndexOf('X');  
+      if ((pos == -1) || (pos + 3 >= licenseString.length()))  
+      {  
+        return false;  
+      }  
+      
+      try  
+      {  
+        int version = Integer.parseInt(licenseString.substring(pos + 1, pos + 3));  
+        if ((version != 1) && (version != 2))  
+        {  
+          return false;  
+        }  
+      
+        String lengthStr = licenseString.substring(pos + 3);  
+        int encodedLicenseLength = Integer.valueOf(lengthStr, 31).intValue();  
+      
+        return pos == encodedLicenseLength;  
+      }  
+      catch (NumberFormatException e)  
+      {  
+      }  
+      
+      return false;  
+    }  
+      
+    public boolean canDecode(String licenseString)  
+    {  
+      return true;  
+    }  
+
+
+
+
+修改doDecode方法
+
+
+    public Properties doDecode(String licenseString)  
+      {  
+          Properties result = null;  
+          String encodedLicenseTextAndHash = null;  
+        if (canDecode2(licenseString)){  
+            encodedLicenseTextAndHash = getLicenseContent(removeWhiteSpaces(licenseString));  
+            byte[] zippedLicenseBytes = checkAndGetLicenseText(encodedLicenseTextAndHash);  
+            Reader licenseText = unzipText(zippedLicenseBytes);  
+            result = loadLicenseConfiguration(licenseText);  
+        } else {  
+            encodedLicenseTextAndHash = removeWhiteSpaces(licenseString);  
+            result = new Properties();  
+                
+              if (encodedLicenseTextAndHash != null && encodedLicenseTextAndHash.length()>0){  
+                    
+                  String[] proStrs = encodedLicenseTextAndHash.split(",");  
+              if (proStrs!= null && proStrs.length>0){  
+                  for (String property : proStrs){  
+                      String[] proStr = property.split("=");  
+                          result.put(proStr[0], proStr[1]);  
+                      }  
+                  }  
+              }  
+        }  
+          
+      
+        return result;  
+      }  
+
+
+
+
+LicenseManager类
+
+修改hasValidLicense方法，直接返回true；
+
+public boolean hasValidLicense(String licenseKey)  
+  {  
+    return true;  
+    //return (getLicense(licenseKey) != null) && (!getLicense(licenseKey).isExpired());  
+  } 
+================
 
 
 1.安装 atlassian-jira-6.3.6.tar.gz
