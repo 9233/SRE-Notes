@@ -1,0 +1,48 @@
+安装git
+# yum -y install git
+
+添加git用户 设置密码git
+#useradd git
+#passwd git
+
+拷贝本机初始管理员公钥 id_rsa.pub 到服务器:
+
+安装gitolite
+git clone https://github.com/sitaramc/gitolite.git
+
+先安装依赖库:
+yum install perl-Data-Dumper.x86_64
+然后:
+gitolite/install -to /home/git/bin/
+(to 后面加 绝对路径)
+
+安装管理员公钥:
+bin/gitolite setup -pk id_rsa.pub
+
+从管理员机器 拉管理仓库 设置权限, 然后push
+git clone git@192.168.165.63:gitolite-admin
+
+
+vi gitolite-admin/conf/gitolite.conf
+======
+repo gitolite-admin
+    RW+     =   id_rsa
+
+repo mygit
+    RW+     =   zhangsan lisi wangwu
+========
+git add -A
+git commit -m 'add mygit'
+git push origin master
+
+添加允许访问mygit仓库成员的公钥
+
+在server的 /home/git/.ssh/authorized_keys添加 张三的key
+
+# gitolite start
+......
+command="/home/git/bin/gitolite-shell zhangsan",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDlv0yQWxRChcHj8hsj+TcuAs7jumC7PA5lz5K6+XdCGV7N+qhdtoPJojR6JMFGpNoZjYU0oRLN6LF/PTrK9F/x7J3F9ihCw4BQSbOPTm5oFtCZ7wj7ENLezIk946+izrx09XmvCioxmreHsOxRtsbnZdvgMUzRbRhJzAkoJL5+5US7NSldhpZLM46ODn6YqOYWoMAqw/S9f5uvHDa6EaXLxwWOm/QTBc+LqCG7737lec3uJz3CMSp6b0KiSPkVaS3ZpbCpM6UUY4gey0FZ8E+6gbDnRMykXrpJ94HJHl967hwLCKEtdKHpHYn26iPr4KBM48KZ3qLF1bxCOBzVzrkJ android@android-OptiPlex-7050
+......
+# gitolite end
+
+
