@@ -1,0 +1,258 @@
+网页连接地址: https://www.cnblogs.com/web1992/p/4714465.html
+
+gitweb 搭建教程
+1. 前言
+
+　　git 是一个版本控制工具，类似svn.
+
+　　本文内容主要涉及git仓库通过浏览器访问(用web的方式去查看git提交历史记录,tag,branch等信息)，即gitweb.
+
+　　效果图：
+
+　　　　　　
+
+　　　　　　
+
+　　在这里说下 gitweb 的运行流程（组成部分），方便整理思路以及后续查找问题所在，组成图：
+
+　　　　　　
+
+　　想要搭建gitweb 必须准备三个主要环境支持:apache, cgi 运行环境，git
+
+　　apache  提供浏览器的方式，就如Svn 可以通过浏览器访问一样，都是有apache 的支持
+
+　　cgi  这里用来解析gitweb.cgi 脚本（就如html 通过浏览器解析，变成网页一样）
+
+　　git  环境支持，如同运行java程序，一定要有jdk 环境一样
+
+　　
+
+ 
+
+　　2. git 仓库初始化
+
+　　　　　　这里仓库的作用就如数据库，来存储你的代码
+复制代码
+
+sudo mkdir demo2
+cd demo2/
+
+sudo git init
+
+Initialized empty Git repository in /data/git/demo1/demo2/.git/ls -la
+total 0
+drwxr-xr-x   3 root  wheel  102  8  9 22:15 .
+drwxr-xr-x   6 root  wheel  204  8  9 22:14 ..
+drwxr-xr-x  10 root  wheel  340  8  9 22:15 .git
+
+// readme.md  新建文件
+// 把新建的文件添加到git 索引中 (. 不能少，表示当前目录下的所有文件)
+sudo git add .
+
+git status   // 查看状态
+
+On branch master
+
+Initial commit
+
+Changes to be committed:
+  (use "git rm --cached <file>..." to unstage)
+
+    new file:   readme.md
+// 提交
+sudo git commit -am "init"   
+
+[master (root-commit) 832bb9e] init
+ 1 file changed, 2 insertions(+)
+ create mode 100644 readme.md
+
+复制代码
+
+　　　3. 配置Apache 的cgi模块 
+
+　　　　cgi 按照可以参照 (http://www.cnblogs.com/web1992/p/4525286.html)
+
+　　　　 查询你的apache 是否安装了cgi  模块，命令如下
+复制代码
+
+ sudo apachectl -M |grep cgi
+ // 出现这个 cgi-module 表示已经安装了cgi 
+ proxy_fcgi_module (shared)
+ proxy_scgi_module (shared)
+ cgi_module (shared)
+
+　
+
+复制代码
+
+　　在 Apache httpd.conf 配置文件中添加
+
+　　　　Include /etc/apache2/vhost/*.conf　
+
+           #这里的意思我的 gitweb.conf 文件放在 /etc/apache2/vhost/ 文件夹下面，
+
+　　　　这里通过Apache 的虚拟主机（vhost）来访问gitweb，配置如下(都有英文注释)：
+复制代码
+
+localhost:vhost web$ cat gitweb.conf 
+        
+#Alias /git /usr/local/git/share/gitweb
+#Alias /git /usr/local/git-share/share/gitweb
+Alias /git /usr/local/share/gitweb/gitweb/ 
+
+<Directory /usr/local/share/gitweb/gitweb/>
+  #Options +ExecCGI
+  #AddHandler cgi-script .cgi
+  #DirectoryIndex gitweb.cgi
+  # Let anyone see our repositories (for now)
+  Order allow,deny
+  AllowOverride None
+ # Rquiree all granted
+  Options Indexes FollowSymLinks ExecCGI
+  Allow from all
+  Satisfy Any
+  # Enable CGI in this directory
+  Options +ExecCGI
+  
+  # Run .cgi files using mod_cgi
+  AddHandler cgi-script .cgi
+  
+  # Use gitweb.cgi for directory listings. This takes care of
+  # requests to /git and /git/
+  # 配置index 
+
+  DirectoryIndex gitweb.cgi
+  
+  # This tells gitweb.cgi where to find its config file
+  # By default it looks in /etc/gitweb.conf, so if you place
+  # your config file somewhere else you should specify this.
+  #SetEnv  GITWEB_CONFIG  /etc/gitweb.conf
+  
+  #SetEnv  GITWEB_CONFIG    /usr/local/git/share/gitweb/gitweb-css.conf
+  # 这里配置git仓库位置，css 样式, git 安装路径 
+  # gitweb-css.conf  十分重要
+  SetEnv  GITWEB_CONFIG    /usr/local/share/gitweb/gitweb/gitweb-css.conf
+  
+  # Enable mod_rewrite
+  RewriteEngine on
+  
+  # Rewrite /git/repo.git URIs to be /git/gitweb.cgi/repo.git
+  # This assumes your repository names end with '.git'. I don't
+  # know if that is always a safe assumption.
+  RewriteRule ^([^.]+\.git.*)$ /git/gitweb.cgi/$0 [L,PT]
+</Directory>
+
+复制代码
+
+　　 在这里注意，我的gitweb 相关的cgi脚本 & 静态的资源（css,img等）都在
+
+　　　/usr/local/share/gitweb/gitweb/
+
+　　　　文件下面，如下：　
+复制代码
+
+localhost:vhost web$ ls -la /usr/local/share/gitweb/gitweb/
+total 504
+drwxr-xr-x  5 web  admin     170  8  9 01:40 .
+drwxr-xr-x  3 web  admin     102  8  9 01:11 ..
+-rw-r--r--  1 web  admin    1303  8  9 01:40 gitweb-css.conf
+-rwxr-xr-x  1 web  admin  251379  8  9 01:15 gitweb.cgi
+drwxr-xr-x  6 web  admin     204  8  9 01:11 static
+localhost:vhost web$ 
+
+复制代码
+
+　　4.  gitweb cgi脚本配置 & 静态资源配置
+
+　　　  gitweb-css.conf  内容：　 
+复制代码
+
+localhost:vhost web$ cat /usr/local/share/gitweb/gitweb/gitweb-css.conf 
+
+#####################################################################################
+# This is the directory where your git repositories live
+# git 的仓库位置，十分重要
+$projectroot = '/data/git/';
+
+# This is the title of the site
+$site_name = "用用的笨笨笨笨的用用 gitweb site";
+
+# This is used to generate the URI for each repo
+$my_uri = "/git";
+
+# Text and URI for the home link
+$home_link_str = "My Projects";
+# 好像不支持中文 %>_<%
+#$home_link_str = "用用的笨笨笨笨的用用 Projects";
+$home_link = "/git";
+
+# These tell gitweb the URIs for the images and css it needs.
+# Depending on the version of GitWeb you have there may be
+# different locations. Newer versions include a /static/ path
+# element and a javascript library.
+
+###### OLDER GITWEB ######################
+#@stylesheets = ("/git/gitweb.css");
+#$logo = "/git/git-logo.png";
+#$favicon = "/git/git-favicon.png";
+#$javascript = "/git/gitweb.js";
+#  这里配置css  样式的路径，如果配置不正确，页面就会很丑的~~
+##### NEWER GITWEB #######################
+@stylesheets = ("/git/static/gitweb.css");
+$logo = "/git/static/git-logo.png";
+$favicon = "/git/static/git-favicon.png";
+$javascript = "/git/static/gitweb.js";
+
+
+# This just makes the description field wider so you can read 
+# it better
+$projects_list_description_width = 50;
+
+# This makes repo links use pretty URLs like /git/repo.git
+$feature{'pathinfo'}{'default'} = [1];
+
+复制代码
+
+　　编辑 gitweb.cgi  在文件的 约77 行处，可以找到  our $GIT   这里 设置git 的安装路径（如果安装git路径不配置不正确，会报500内部错误） 
+复制代码
+
+  73 # core git executable to use
+  74 # this can just be "git" if your webserver has a sensible PATH
+  75 #our $GIT = "/usr/local/git/bin/git";
+  76 #our $GIT = "/usr/local/bin/git";
+  77 our $GIT = "/usr/bin/git";
+  78 
+  79 # absolute fs-path which will be prepended to the project path
+  80 #our $projectroot = "/pub/scm";
+  81 our $projectroot = "/pub/git";
+
+复制代码
+
+　　第一行可以看到 #!/usr/bin/perl  字样，使用perl 写的页面（好羡慕 😢）
+复制代码
+
+   1 #!/usr/bin/perl
+   2 
+   3 # gitweb - simple web interface to track changes in git repositories
+   4 #
+   5 # (C) 2005-2006, Kay Sievers <kay.sievers@vrfy.org>
+   6 # (C) 2005, Christian Gierke
+   7 #
+   8 # This program is licensed under the GPLv2
+
+复制代码
+
+ 
+
+　　如何查询自己的git 安装路径
+
+localhost:vhost web$ which git
+/usr/bin/git
+
+ 　在这里配置之后重启Apache ，在浏览器访问：http://127.0.0.1/git/
+
+　　
+
+　 giweb附件：　http://pan.baidu.com/s/1c0nqjxY　
+
+　 end ~
