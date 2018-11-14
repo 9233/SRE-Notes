@@ -1,0 +1,55 @@
+1.下载tomcat 9.0 和最新版OpenGrok，并把source.war这个文件放在Tomcat的webapp目录下：
+
+sudo cp /data/opengrok/soft/opengrok-1.1-rc73/lib/source.war /data/opengrok/soft/tomcat9/webapps
+
+cd /data/opengrok/sourcecode/u300 拉取代码
+$ /usr/bin/repo init -u gerritsh:mt6761p/platform/manifest -b sw -m MT6761P_DEV_V1.1.xml
+$ repo sync -c --no-tags -r SH
+
+cd /data/opengrok/project
+ln -s /data/opengrok/sourcecode/c210 c210
+ln -s /data/opengrok/sourcecode/u300 u300
+
+创建索引和配置文件
+java -jar /data/opengrok/soft/opengrok-1.1-rc73/lib/opengrok.jar -P -S -v -s /data/opengrok/project -d /data/opengrok/codeindex -I *.java -I *.c -I *.h -I *.cpp -W /data/opengrok/conf/configuration.xml
+
+
+修改tomcat配置文件路径,重启服务
+cd soft/apache-tomcat-9.0.13/bin/
+./shutdown.sh 
+./startup.sh 
+
+设置定时任务
+0 1 * * * python3 /data/opengrok/autotools/OpenGrok.py
+
+OpenGrok.py
+============
+import os
+import datetime
+
+homedir =  '/data/opengrok'
+projectlist = ['u300','c200','c210']
+
+for project in projectlist:
+    os.chdir(homedir+'/sourcecode/'+project)
+    print('开始同步'+project)
+    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    print(now)
+    os.system('repo sync -c --no-tags -r SH')
+    print(project + '同步完成!')
+    print(now)
+
+
+print('代码同步完成 开始创建索引')
+
+cmd = 'java -jar /data/opengrok/soft/opengrok-1.1-rc73/lib/opengrok.jar -P -S -v -s /data/opengrok/project -d /data/opengrok/codeindex -I *.java -I *.c -I *.h -I *.cpp -W /data/opengrok/conf/configuration.xml'
+
+os.system(cmd)
+
+print('索引创建完成,准备重启tomcat服务器')
+
+cmd2 = '/data/opengrok/soft/apache-tomcat-9.0.13/bin/shutdown.sh'
+cmd3 = '/data/opengrok/soft/apache-tomcat-9.0.13/bin/startup.sh'
+os.system(cmd2)
+os.system(cmd3)
+============
