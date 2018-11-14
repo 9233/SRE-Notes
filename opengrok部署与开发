@@ -31,7 +31,7 @@ ln -s /data/opengrok/sourcecode/u300 u300
 强烈建议通过java -jar ~/Install/opengrok-1.1-rc41/lib/opengrok.jar -h查看每一个参数的意义，比如我最终的命令是下面这样：
 
 创建索引和配置文件
-java -jar /data/opengrok/soft/opengrok-1.1-rc73/lib/opengrok.jar -P -S -v -s /data/opengrok/project -d /data/opengrok/codeindex -I *.java -I *.c -I *.h -I *.cpp -W /data/opengrok/conf/configuration.xml
+java -jar /data/opengrok/soft/opengrok-1.1-rc73/lib/opengrok.jar -P -S -v -s /data/opengrok/project -d /data/opengrok/codeindex -I *.java -I *.c -I *.h -I *.xml -I *.cpp -W /data/opengrok/conf/configuration.xml
 
 其中-s表明项目地址，-d表明索引输出地址，-W表明配置输出地址，都是必须的。对于Git和Vim不要-I参数可能都没有问题，但对于Android源码，如果不要这个参数产生的索引就会不可用，因为.jar、.so等文件都无法建立索引，所以这里我指定了只对Java和C、C++相关的文件建立索引，不仅建立速度更快，占用空间也更小。
 
