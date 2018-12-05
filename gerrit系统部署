@@ -1,0 +1,215 @@
+ubuntu 14.0 lts 搭建 gerrit 2.15
+
+apt-get install git
+apt-get install apache2
+
+cat /etc/apache2/sites-enabled/gerrit-httpd.conf
+
+<VirtualHost *:8088>
+    ProxyRequests Off
+    ProxyVia Off
+    ProxyPreserveHost On
+    AllowEncodedSlashes On
+    RewriteEngine On
+    RewriteRule ^/(.*) http://192.168.160.3:8081/$1 [NE,P]
+
+    <Proxy *>
+          Order deny,allow
+          Allow from all
+    </Proxy>
+
+    <Location /login/>
+        AuthType Basic
+        AuthName "Gerrit Code Review"
+        Require valid-user
+        AuthBasicProvider file
+        AuthUserFile /etc/apache2/passwords
+    </Location>
+
+    ProxyPass / http://192.168.160.3:8081/
+
+</VirtualHost>
+
+
+注：如httpd.conf没有Include到apache2.conf中，需手动添加：
+
+sudo vi /etc/apache2/apache2.conf
+
+添加，
+
+Include httpd.conf
+
+==
+修改配置文件，添加对8081端口的监听：
+
+sudo vi /etc/apache2/ports.conf
+
+添加，
+
+Listen 8081
+
+ 
+
+开启SSL、Proxy、Rewrite等模块：
+
+cd /etc/apache2/mods-enabled/
+
+ 
+
+sudo ln -s ../mods-available/proxy.load
+sudo ln -s ../mods-available/proxy.conf
+sudo ln -s ../mods-available/proxy_http.load
+sudo ln -s ../mods-available/proxy_balancer.conf
+sudo ln -s ../mods-available/proxy_balancer.load
+sudo ln -s ../mods-available/rewrite.load
+sudo ln -s ../mods-available/ssl.conf
+sudo ln -s ../mods-available/ssl.load
+sudo ln -s ../mods-available/slotmem_shm.load
+sudo ln -s ../mods-available/socache_shmcb.load
+
+
+=======================
+安装配置gerrit
+下载地址：https://www.gerritcodereview.com/
+
+java -jar gerrit-2.15.3.war init -d review_site
+
+选择配置如下:
+
+======================
+[gerrit]
+	basePath = git
+	serverId = a5777c54-a3b4-4850-932c-b65adb27b247
+	canonicalWebUrl = http://192.168.160.3:8081/
+[database]
+	type = h2
+	database = /data/gerrit/gerrit_site/db/ReviewDB
+[noteDb "changes"]
+	disableReviewDb = true
+	primaryStorage = note db
+	read = true
+	sequence = true
+	write = true
+[index]
+	type = LUCENE
+[auth]
+	type = HTTP
+[receive]
+	enableSignedPush = false
+[sendemail]
+	enable = true
+	smtpServer = 192.168.10.8
+	smtpServerPort = 25
+	smtpUser = tinnoscm@tinno.com
+	smtpPass = tinno@2013
+	from = Code Review <tinnoscm@tinno.com>
+
+[container]
+	user = android
+	javaHome = /usr/lib/jvm/java-8-openjdk-amd64/jre
+[sshd]
+	listenAddress = *:29418
+[httpd]
+	listenUrl = http://*:8081/
+[cache]
+	directory = cache
+[http]
+        proxy = http://192.168.160.3:8088
+        proxyUsername = gerrit
+        proxyPassword = Aa123456
+[gitweb]
+    type = gitweb
+    cgi = /usr/lib/cgi-bin/gitweb.cgi
+=================
+
+接下来，配置gerrit账户：
+ 
+
+touch ~/review_site/passwords
+sudo htpasswd -b ~/review_site/passwords admin Aa123456
+
+默认第一个用户为管理员用户！
+
+
+＝＝＝＝＝
+安装配置gitweb
+
+apt-get install gitweb
+
+查看相关配置文件安装路径：
+
+dpkg -L gitweb
+
+得到输出如下：
+
+/.
+/usr
+/usr/share
+/usr/share/doc
+/usr/share/doc/gitweb
+/usr/share/doc/gitweb/examples
+/usr/share/doc/gitweb/examples/index.aux-generation
+/usr/share/doc/gitweb/README.Debian
+/usr/share/doc/gitweb/copyright
+/usr/share/doc/gitweb/README
+/usr/share/doc/gitweb/NEWS.Debian.gz
+/usr/lib
+/usr/lib/cgi-bin
+/etc
+/etc/apache2
+/etc/apache2/conf.d
+/etc/apache2/conf.d/gitweb
+/etc/gitweb.conf
+/usr/share/doc/gitweb/changelog.Debian.gz
+/usr/lib/cgi-bin/gitweb.cgi
+
+根据上面的地址在gerrit.conf中添加如下配置：
+
+[gitweb]
+    type = gitweb
+    cgi = /usr/lib/cgi-bin/gitweb.cgi
+
+相关说明：
+
+gitweb集成gerrit后，默认只有管理员用户才能查看gitweb超链接，普通用打开链接后页面显示Not Found。如果想给普通的用户查看gitweb超链接的权限，则必须对项目设置refs/meta/config 的read权限。而这个权限在All-Projects的ACL里只对Administrators用户和Project Owners开放。
+
+重启gerrit和apache2
+
+root 用户执行 : /data/gerrit/gerrit_site/bin/gerrit.sh restart
+                 service apache2 restart
+
+ 
+
+ 
+
+8. 访问gerrit 管理界面
+
+浏览器输入：
+
+http://192.168.130.10:8088/
+
+在弹出框输入htpasswd命令设置的账号密码即可。
+
+服务器端:
+管理员　创建项目分支，用户组，设置访问权限等等！
+
+客户端 拉代码：
+
+创建好用户　然后用户登录　把ssh公钥填进去
+cat ~/.ssh/config
+
+host gerrit3
+user taishan
+hostname 192.168.160.3
+port 29418
+identityFile ~/.ssh/id_rsa
+
+然后拉取：
+git clone gerrit3:omadm
+
+gitdir=$(git rev-parse --git-dir); scp -p -P 29418 taishan@192.168.160.3:hooks/commit-msg ${gitdir}/hooks/
+
+git push origin HEAD:/refs/for/master
+
+
+gitdir=$(git rev-parse --git-dir); scp -p -P 29418 taishan@192.168.160.3:hooks/commit-msg ${gitdir}/hooks/
