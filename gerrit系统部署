@@ -213,3 +213,12 @@ git push origin HEAD:/refs/for/master
 
 
 gitdir=$(git rev-parse --git-dir); scp -p -P 29418 taishan@192.168.160.3:hooks/commit-msg ${gitdir}/hooks/
+
+全局部署hooks/commit-msg
+
+$mkdir -p ~/.git_template/hooks  
+$cp commit-msg ~/.git_template/hooks  
+$git config --global init.templatedir ~/.git_template
+
+wget http://192.168.160.3:8081/tools/hooks/commit-msg
+
