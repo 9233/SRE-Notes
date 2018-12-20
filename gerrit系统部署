@@ -100,9 +100,9 @@ java -jar gerrit-2.15.3.war init -d review_site
 	enable = true
 	smtpServer = 192.168.10.8
 	smtpServerPort = 25
-	smtpUser = tinnoscm@tinno.com
-	smtpPass = tinno@2013
-	from = Code Review <tinnoscm@tinno.com>
+	smtpUser = tinnoscm@t****.com
+	smtpPass = t***@2013
+	from = Code Review <tinnoscm@t***.com>
 
 [container]
 	user = android
