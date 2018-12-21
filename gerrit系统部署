@@ -221,4 +221,22 @@ $cp commit-msg ~/.git_template/hooks
 $git config --global init.templatedir ~/.git_template
 
 wget http://192.168.160.3:8081/tools/hooks/commit-msg
+========
+Git仓库转移
+
+ 2106  git branch -a
+ 2107  git checkout MT6761P_DEV_V1.0
+ 2108  git checkout MTK6739-O1-DEV-V4.1
+ 2109  git checkout master
+ 2110  ll
+ 2111  git checkout MTK6739-O1-DEV-V4.1
+ 2112  ll
+ 2113  git remote -v
+ 2114  git remote set-url origin gerrit3:omadm
+ 2115  git remote -v
+ 2116  git branch -r
+ 2117  git push --all
+
+
+
 
