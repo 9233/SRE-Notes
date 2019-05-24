@@ -1,0 +1,63 @@
+flask部署 到　 apache
+
+apt-get install python　flask
+apt-get install apache2　libapache2-mod-wsgi
+
+1.访问目录
+在/var/www目录下新建myweb文件夹，并新增两个文件：hello.py 和 app.wsgi 
+hello.py示例代码如下：
+
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return ‘index page’
+
+if __name__ == '__main__':
+    app.run()
+
+或者flasky　APP
+
+
+app.wsgi示例代码如下：
+
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
+sys.path.insert(0,'/var/www/myweb')
+from hello import app as application
+
+或者:
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
+sys.path.insert(0,'/home/android/ta/flask/pms')
+from flasky import app as application
+
+
+2.apache配置
+在/etc/apache2/sites-avalible目录下新增配置文件myweb.conf 
+myweb.conf示例代码如下：
+
+<VirtualHost *:8000>
+    ServerName 192.168.164.1
+
+    WSGIDaemonProcess myweb threads=5
+    WSGIScriptAlias / /var/www/myweb/app.wsgi
+
+    <Directory /var/www/myweb>
+        WSGIProcessGroup myweb
+        WSGIApplicationGroup %{GLOBAL}
+        WSGIScriptReloading On
+        Order deny,allow
+        Allow from all
+    </Directory>
+</VirtualHost>
+
+3.配置生效
+执行如下命令使站点生效：
+
+a2ensite myweb.conf
+service apache2 reload
