@@ -100,8 +100,8 @@ java -jar gerrit-2.15.3.war init -d review_site
 	enable = true
 	smtpServer = 192.168.10.8
 	smtpServerPort = 25
-	smtpUser = tinnoscm@t****.com
-	smtpPass = t***@2013
+	smtpUser = tinnoscm@****.com
+	smtpPass = password
 	from = Code Review <tinnoscm@t***.com>
 
 [container]
@@ -126,7 +126,7 @@ java -jar gerrit-2.15.3.war init -d review_site
  
 
 touch ~/review_site/passwords
-sudo htpasswd -b ~/review_site/passwords admin Aa123456
+sudo htpasswd -b ~/review_site/passwords admin Aa123456***
 
 默认第一个用户为管理员用户！
 
