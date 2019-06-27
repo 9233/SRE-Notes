@@ -1,0 +1,12 @@
+配置管理工程师，运维开发工程师
+
+主要技能
+1.python flask　自动化工具系统开发!
+      log分析系统，　patch查询和merge系统，　(服务器管理，编译机管理，gerrit管理等系统)
+ 
+
+2.git jenkins jira gerrit等
+
+3.hadoop分布式存贮
+
+4.nginx apache mysql等系统部署与维护．
