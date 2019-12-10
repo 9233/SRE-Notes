@@ -1,4 +1,7 @@
 添加硬盘
+格式化, 挂载,加入/etc/fstab
+
+
 fdisk 只能添加2T的硬盘，
 
 3T硬盘使用 gparted
