@@ -21,3 +21,19 @@ hadoop fs -mkdir dir：创建目录dir
 hadoop fs -rmr dir：删除目录dir
 
 
+
+
+
+https://blog.csdn.net/weixin_38070561/article/details/81289601
+import pyhdfs
+
+client = pyhdfs.HdfsClient('192.168.163.24:9870', user_name='root')
+
+print(client.get_home_directory())
+
+print(client.get_active_namenode())
+print(client.listdir('/Tinno'))
+
+#client.mkdirs('/Tinno/SW')
+
+client.copy_from_local('D:/scvpn.exe', '/Tinno/SW/scvpn.exe')
