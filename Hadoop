@@ -32,8 +32,8 @@ client = pyhdfs.HdfsClient('192.168.163.24:9870', user_name='root')
 print(client.get_home_directory())
 
 print(client.get_active_namenode())
-print(client.listdir('/Tinno'))
+print(client.listdir('/user'))
 
-#client.mkdirs('/Tinno/SW')
+#client.mkdirs('/user/SW')
 
-client.copy_from_local('D:/scvpn.exe', '/Tinno/SW/scvpn.exe')
+client.copy_from_local('D:/1.exe', '/user/SW/1.exe')
