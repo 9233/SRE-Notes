@@ -1,0 +1,4 @@
+https://blog.csdn.net/deng624796905/article/details/86493330
+https://my.oschina.net/jamesview/blog/2994112
+
+docker exec -it jenkins bash;
