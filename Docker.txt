@@ -1,21 +1,14 @@
 # 通过yum源安装docker
-sudo yum -y install docker
+yum -y install docker
 # 启动docker
-sudo systemctl start docker
+systemctl start docker
 # 开机自启
-sudo systemctl enable docker
+systemctl enable docker
 
 # 查找centos镜像
 docker search centos
 # 下载centos镜像
-sudo docker pull docker.io/centos:latest
-
-列出镜像
-sudo docker image ls
-删除镜像
-sudo docker image rm 4655e9997674
-
-
+docker pull docker.io/centos:latest
 
 
 1.下载nginx
@@ -56,19 +49,11 @@ docker rm <CONTAINER ID>        #删除Docker
 
 
 
-创建容器并进入
-sudo docker run -t -i --name tinno-jenkins docker.io/jenkins:latest /bin/bash
-参数说明: -t分配一个伪终端并绑定到容器的标准输入，-i 让容器的标准输入保持打开
-
-启动容器
-sudo docker start tinno-jenkins
-
+查看当前运行的容器
+sudo docker ps
 
 查看所有容器
 sudo docker ps -a
-
-查看当前运行的容器
-sudo docker ps
 
 
 进入容器环境
@@ -76,37 +61,17 @@ sudo docker attach tinno-jenkins
 ## 其它方法
 sudo docker exec -it 775c7c9ee1e1 /bin/bash
 
+
 向容器内部发送指令
 我们可以在不进入容器环境的情况下, 向容器内部发送指令
-
 sudo docker exec tinno-jenkins touch 123.txt
 
 
-停止容器
-sudo docker stop tinno-jenkins
-
-删除容器
-将容器停止后, 可以删除容器
-sudo docker rm tinno-jenkins
-
-(选学)docker高级命令
+docker高级命令
 交换文件 docker cp
 通过docker cp命令, 可以实现容器与外部环境的文件交换
 我们在docker容器内部新建一个123.txt文件, 将它拷贝到外部环境, 在外部环境新建一个456.txt拷贝到docker容器内部(如下图)
 
-即使容器处于未激活状态, 也是可以进行文件交换的
-将修改后的容器发布为镜像
-# 将修改后的容器发布为镜像, `-a`表示作者, `-m`表示对本次修改的说明
-sudo docker commit -a "zhaoolee" -m "add 123.txt 456.txt" zhaoolee-centos zhaoolee-centos:0.1
-# 基于新建的镜像创建容器
-sudo docker run -t -i --name my-centos zhaoolee-centos:0.1 /bin/bash
-
-查看镜像的信息
-# 查看刚刚新建的镜像信息
-sudo docker history zhaoolee-centos:0.1
-
-查看容器内变动日志
-sudo docker diff zhaoolee-centos
 
 查看镜像和容器的详细信息
 # 查看镜像的详细信息
@@ -115,12 +80,17 @@ sudo docker inspect zhaoolee-centos:0.1
 sudo docker inspect zhaoolee-centos
 
 
+
 第四部分: 私有仓库的创建
 1. 下载私有仓库注册服务器的镜像
 sudo docker pull registry:latest
 
 2. 创建一个注册服务器容器
-sudo docker run -d -p 5000:5000 --name server-registry -v /tmp/registry:/tmp/registry docker.io/registry:latest
+
+docker run -d -p 5000:5000 --name=server-registry --restart=always --privileged=true  -v /var/lib/docker/registry:/var/lib/registry  docker.io/registry
+
+
+docker run -d -p 5000:5000 --name server-registry -v /tmp/registry:/tmp/registry docker.io/registry:latest
 参数说明 -d容器在后端运行, -p 5000:5000在容器的5000端口运行并映射到外部系统的5000端口, --name server-registry容器命名为server-registry, -v /tmp/registry /tmp/registry把宿主机的目录/tmp/registry挂载到容器目录/tmp/registry
 
 vim /etc/docker/daemon.json
@@ -130,33 +100,28 @@ vim /etc/docker/daemon.json
    "registry-mirrors": ["https://registry.docker-cn.com"]
   }
 
+将修改好的容器commit出一个镜像.
+docker commit 39eaa5aa7332 python3.6.4-dev
+docker commit 8619e3527aa8 192.168.165.109:5000/mynginx2
+docker images
+docker push 192.168.165.109:5000/mynginx2
+
+
+
 3. 为本地镜像添加标签，并将其归入本地仓库
 为本地镜像添加标签
-sudo docker tag SourceIamgeName 192.168.163.24:5000/SourceIamgeName2.0
+docker tag SourceIamgeName 192.168.163.24:5000/SourceIamgeName2.0
+
 将被标记的本地镜像, push到仓库
-sudo docker push 192.168.163.245000/SourceIamgeName2.0
+docker push 192.168.165.109:5000/SourceIamgeName2.0
 
 4.测试本地仓库的的可用性
-在虚拟机内网,开启另一台ubuntu16.04虚拟机, unbutu16.04尝试从centos7获取刚刚创建的镜像zhaoolee-centos:0.1
 
-sudo docker pull 192.168.163.245000/SourceIamgeName2.0
+docker pull 192.168.165.109:5000/mynginx2
+docker images
+docker ps
+docker run -d --name mynginx -p 8000:80 192.168.165.109:5000/mynginx2
 
-
-
-以下是 部署一个docker 的 jenkins 容器
-
-docker run -d --name jenkins -p 8081:8080 -v /root/docker/jenkins jenkins/jenkins;
-
-docker exec -it jenkins bash；
-
-docker tag jenkins 192.168.163.24:5000/jenkins
-
-docker push 192.168.163.24:5000/jenkins:latest
-
-
-docker run -d -v /home/registory:/var/lib/registry -p 5000:5000 --restart=always --privileged=true --name registry registry:latest
-
-将容器打包成镜像!
 
 
 
@@ -166,5 +131,5 @@ docker run -d -v /home/registory:/var/lib/registry -p 5000:5000 --restart=always
 
 https://blog.csdn.net/deng624796905/article/details/86493330
 https://my.oschina.net/jamesview/blog/2994112
-
-docker exec -it jenkins bash;
+https://www.jianshu.com/p/8f38f198724e
+https://www.cnblogs.com/Huang-Niu/p/11407914.html
