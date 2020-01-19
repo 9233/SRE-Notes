@@ -15,6 +15,47 @@ sudo docker image ls
 删除镜像
 sudo docker image rm 4655e9997674
 
+
+
+
+1.下载nginx
+
+docker images　　　　　　　　　　#查看现有安装包
+docker pull nginx　　　　　　　 #安装Nginx
+
+2.运行nginx
+
+docker run -p 80:80 -d nginx 　　#将80端口映射为80还是原先的80端口，或者8080:80，不可以不写。
+ss -an | grep 80　　　　　　　　　　　#查看启动端口
+docker ps　　　　　　　　　　　　　　　#查看docker进程
+
+
+apt-get install vim
+apt-get install yum
+
+
+
+bash命令都一样，但是vi在我机器上是不能用的，但可以使用cp、mv 等命令，因为nginx都是配置好的，不能乱改。
+
+1)可以通过在还未登录nignx容器前，把需要的文件写好，然后复制到指定目录下：
+[root@localhost my.Shells]# docker cp hello.html 60969fd57efc://usr/share/nginx/html
+[root@localhost my.Shells]# docker exec -it 60969fd57efc bash
+root@60969fd57efc:/usr/share/nginx/html# ls
+50x.html  hello.html  index.html
+2）通过主机目录映射到容器
+ docker run -p 80:80 -d -v /opt/html:usr/share/nginx/html nginx
+ 可以使用-v $PWD/html表示把当前路径下html目录映射为usr/share/nginx/html
+ 也就是说主机下的html就是容器下的usr/share/nginx/html
+ html内的文件修改和添加就等同于容器usr/share/nginx/html文件操作
+ 外网访问就可以访问得到，就不用再登录容器操作文件了
+ 
+ 1.卸载服务
+docker ps -a       　　　　　　　 #可查看所有已存在的Docker
+docker stop <CONTAINER ID>      #停止Docker
+docker rm <CONTAINER ID>        #删除Docker
+
+
+
 创建容器并进入
 sudo docker run -t -i --name tinno-jenkins docker.io/jenkins:latest /bin/bash
 参数说明: -t分配一个伪终端并绑定到容器的标准输入，-i 让容器的标准输入保持打开
