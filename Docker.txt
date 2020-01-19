@@ -123,6 +123,13 @@ sudo docker pull registry:latest
 sudo docker run -d -p 5000:5000 --name server-registry -v /tmp/registry:/tmp/registry docker.io/registry:latest
 参数说明 -d容器在后端运行, -p 5000:5000在容器的5000端口运行并映射到外部系统的5000端口, --name server-registry容器命名为server-registry, -v /tmp/registry /tmp/registry把宿主机的目录/tmp/registry挂载到容器目录/tmp/registry
 
+vim /etc/docker/daemon.json
+如果daemon文件不存在，vim会自己创建一个，假如一下代码，
+  {
+  "insecure-registries":["主机的IP地址或者域名:5000"],
+   "registry-mirrors": ["https://registry.docker-cn.com"]
+  }
+
 3. 为本地镜像添加标签，并将其归入本地仓库
 为本地镜像添加标签
 sudo docker tag SourceIamgeName 192.168.163.24:5000/SourceIamgeName2.0
