@@ -1,1 +1,228 @@
-666
+kubernetes翻译成舵手
+kubernetes架构是master/node的主从架构
+k8s Pod 扩容和缩容
+在生产环境下，在面临服务需要扩容的场景时，可以使用Deployment/RC的Scale机制来实现。
+Kubernetes支持对Pod的手动扩容和自动扩容。
+
+手动扩容缩容
+通过执行扩容命令，对某个deployment直接进行扩容：
+
+# kubectl  scale deployment nginx-deployment --replicas=4
+当要缩容，减少副本数量即可：
+
+# kubectl  scale deployment nginx-deployment --replicas=2
+自动扩容缩容
+在使用自动化扩容和缩容，需要kubernetes安装heapster插件。
+
+禁用swap
+swapoff -a
+关闭防火墙
+禁用Selinux
+
+1.机器准备
+
+[root@localhost ~]# cat /etc/hosts
+192.168.165.109 k8s-master
+192.168.165.111 k8s-node1
+192.168.165.118 k8s-node2
+
+yum install epel-release.noarch
+yum install etcd
+
+总结一下使用kubeadm安装k8s：
+1.在master、nodes节点安装kubelet，kubeadm，docker
+2.在master节点上去运行 kubeadm init去初始化集群
+3.各nodes节点上分别执行kubeadm join加入到集群中
+
+yum install epel-release.noarch
+
+vi /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=0
+repo_gpgcheck=0
+
+1.在master节点进行安装docker、kubelet、kubeadm、kubectl
+
+yum install -y docker kubeadm kubectl kubelet kubernetes-cni
+
+systemctl start kubelet
+systemctl enable kubelet
+
+systemctl start docker
+systemctl enable docker
+
+
+kubeadm init --pod-network-cidr=192.168.0.0/16 --apiserver-advertise-address=192.168.165.109 --kubernetes-version=v1.17.0 --ignore-preflight-errors=Swap
+
+--pod-network-cidr是指配置节点中的pod的可用IP地址，此为内部IP
+
+--apiserver-advertise-address 为master的IP地址
+
+--kubernetes-version 通过kubectl version 可以查看到
+
+不幸的是报错, k8s.gcr.io 被墙了，镜像下载失败
+
+
+网络被墙！此时下载镜像会报错，解决办法:
+docker pull registry.cn-hangzhou.aliyuncs.com/google_containers/kube-apiserver:v1.17.0;\
+docker pull registry.cn-hangzhou.aliyuncs.com/google_containers/kube-controller-manager:v1.17.0;\
+docker pull registry.cn-hangzhou.aliyuncs.com/google_containers/kube-scheduler:v1.17.0;\
+docker pull registry.cn-hangzhou.aliyuncs.com/google_containers/kube-proxy:v1.17.0;\
+docker pull registry.cn-hangzhou.aliyuncs.com/google_containers/etcd:3.4.3-0;\
+docker pull registry.cn-hangzhou.aliyuncs.com/google_containers/coredns:1.6.5
+
+docker pull docker.io/jmgao1983/flannel:v0.11.0-amd64
+
+把这些images重新tag一下。
+
+docker tag registry.cn-hangzhou.aliyuncs.com/google_containers/kube-apiserver:v1.17.0 k8s.gcr.io/kube-controller-manager:v1.17.0;\
+docker tag registry.cn-hangzhou.aliyuncs.com/google_containers/kube-controller-manager:v1.17.0 k8s.gcr.io/kube-controller-manager:v1.17.0;\
+docker tag registry.cn-hangzhou.aliyuncs.com/google_containers/kube-scheduler:v1.17.0 k8s.gcr.io/kube-scheduler:v1.17.0;\
+docker tag registry.cn-hangzhou.aliyuncs.com/google_containers/kube-proxy:v1.17.0 k8s.gcr.io/kube-proxy:v1.17.0;\
+docker tag registry.cn-hangzhou.aliyuncs.com/google_containers/etcd:3.4.3-0 k8s.gcr.io/etcd:3.4.3-0;\
+docker tag registry.cn-hangzhou.aliyuncs.com/google_containers/coredns:1.6.5 k8s.gcr.io/coredns:1.6.5
+
+docker tag quay.io/coreos/flannel:v0.11.0-amd64 k8s.gcr.io/flannel:v0.11.0-amd64
+
+/*
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 192.168.165.109:6443 --token ajz0iv.qh18fijs8cpdyd2l \
+    --discovery-token-ca-cert-hash sha256:11acd2ca2659c86e7f03bc21c811f87d9ac1d3f6f066a4dddc55f68dc5b424bc
+*/
+
+
+wget https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+修改相应IP
+kubectl apply -f kube-flannel.yml
+
+
+3.各nodes节点上分别安装:docker、kubelet、kubeadm, 执行kubeadm join加入到集群中
+yum install docker、kubelet、kubeadm
+
+wget https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+修改相应IP
+kubectl apply -f kube-flannel.yml
+
+systemctl start kubelet
+systemctl enable kubelet
+
+systemctl start docker
+systemctl enable docker
+
+kubeadm join 192.168.165.109:6443 --token zxo367.yafk1g1seqzotvyj \
+    --discovery-token-ca-cert-hash sha256:4fd524c9475af3fbbef0b6ef81907d5569412ab2162764595f47d7fc60e2f756
+
+可选参数:  --ignore-preflight-errors=all
+
+安装完成，在Master检测一下：
+
+kubectl get nodes
+kubectl get pod --all-namespaces
+
+k8s部署mysql实例:
+
+新建mysql-rc.yaml
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: mysql-rc
+  labels:
+    name: mysql-rc
+spec:
+  replicas: 1
+  selector:
+    name: mysql-pod
+  template:
+    metadata:
+      labels: 
+        name: mysql-pod
+    spec:
+      containers:
+      - name: mysql
+        image: mysql
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "password"
+
+创建mysql-svc.yaml
+
+[root@k8s-master ~]# cat mysql-svc.yaml 
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-svc
+  labels: 
+    name: mysql-svc
+spec:
+  type: NodePort
+  ports:
+  - port: 3306
+    protocol: TCP
+    targetPort: 3306
+    name: http
+    nodePort: 30000
+  selector:
+    name: mysql-pod
+
+
+安装
+k8s 执行文件，下载mysql镜像和运行mysqlr容器
+
+[root@k8s-master ~]# kubectl create -f mysql-rc.yaml 
+replicationcontroller "mysql-rc" created
+[root@k8s-master ~]# kubectl create -f mysql-svc.yaml 
+service "mysql-svc" created
+
+
+
+docker ps
+docker exec -it 338cd4b675ab bash
+
+
+设置root远程访问
+
+$mysql -u root -p
+Enter password:
+mysql> use mysql;
+mysql> GRANT ALL ON *.* TO 'root'@'%';
+Query OK, 0 rows affected (0.04 sec)
+
+mysql> ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY 'password';
+Query OK, 0 rows affected (0.01 sec)
+
+最后在mysql客户端连接mysql容器实例
+IP：（任意master或node节点IP）
+用户名：root
+密码：password 【设置的密码】
+端口：30000 【设置的端口】
+
+
+
+
+
+
+官方文档:https://github.com/kubernetes/
+参考连接:
+https://blog.tomy168.com/2019/08/centos-76-kubernetes.html
+https://www.jianshu.com/p/f9d6dd0be007
+https://blog.csdn.net/JENREY/article/details/84205838
