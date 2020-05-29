@@ -1,0 +1,29 @@
+1.大文件打包切割与合并
+zip命令分卷压缩和解压缩
+创建分卷压缩文件
+
+zip -s 100m -r folder.zip folder/
+
+    -s: 创建分卷的大小
+    -r: 循环压缩文件夹下面的内容
+
+切分已有的文件：
+
+zip existing.zip --out new.zip -s 50m
+
+ 
+
+执行晚之后回创建下面一系列文件：
+
+new.zip
+new.z01
+new.z02
+new.z03
+...
+
+解压分卷文件
+
+# 将分卷文件合并成一个单独的文件
+zip -s 0 split.zip --out single.zip
+# 解压文件
+unzip single.zip
