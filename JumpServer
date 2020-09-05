@@ -1,0 +1,623 @@
+JumpServer 部署手册
+
+CentOS 7通用配置:
+
+yum upgrade -y
+yum install epel-release -y
+yum install -y java-1.8.0-openjdk
+yum -y install zlib-devel bzip2-devel pcre-devel openssl-devel ncurses-devel sqlite-devel readline-devel tk-devel libffi-devel wget gcc make wget
+
+
+//测试环境使用，生产环境请勿操作
+systemctl stop firewalld.service
+systemctl disable firewalld.service
+sed -i "s/SELINUX=enforcing/SELINUX=disabled/g" /etc/selinux/config
+
+
+
+1.安装Python3.6
+官网下载源码包Python-3.6.12.tgz
+tar vxf Python-3.6.12.tgz
+cd Python-3.6.12
+./configure prefix=/usr/local/python3
+make && make install
+ln -s /usr/local/python3/bin/python3.6 /usr/bin/python3
+ln -s /usr/local/python3/bin/pip3 /usr/bin/pip3
+pip3 install --upgrade pip
+python3 --version
+python3.6 -m venv /opt/py3
+python3 -m venv /opt/py3
+source /opt/py3/bin/activate
+
+
+2.安装MariaDB
+防火墙策略：
+firewall-cmd --permanent --add-rich-rule="rule family="ipv4" source address="******/24" port protocol="tcp" port="3306" accept"
+firewall-cmd --reload
+
+yum install -y mariadb mariadb-server mariadb-devel
+systemctl start mariadb.service
+systemctl enable mariadb.service
+
+创建数据库及授权
+mysql -uroot -p
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED BY 'nicePassword';
+#GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY 'nicePassword';
+create database jumpserver default charset 'utf8' collate 'utf8_bin';
+grant all on jumpserver.* to 'jumpserver'@'localhost' identified by 'nicePassword';
+flush privileges;
+
+
+
+3.安装Redis
+防火墙策略
+firewall-cmd --permanent --add-rich-rule="rule family="ipv4" source address="******/24" port protocol="tcp" port="6379" accept"
+firewall-cmd --reload
+
+安装
+yum install -y redis
+
+修改配置:
+vi /etc/redis.conf
+
+...
+# bind 127.0.0.1  # 注释这行, 新增如下内容
+bind 0.0.0.0
+requirepass weakPassword  # redis 连接密码
+maxmemory-policy allkeys-lru  # 清理策略, 优先移除最近未使用的key
+...
+
+启动Redis
+systemctl start redis.service
+systemctl enable redis.service
+
+
+
+4.Nginx部署
+
+firewall-cmd --zone=public --add-port=80/tcp --permanent
+firewall-cmd --zone=public --add-port=443/tcp --permanent
+firewall-cmd --zone=public --add-port=2222/tcp --permanent
+firewall-cmd --reload
+
+
+yum install -y nginx
+
+
+
+启动 nginx
+nginx -t
+systemctl enable nginx
+systemctl start nginx
+
+
+
+cat  /etc/nginx/nginx.conf
+===
+# For more information on configuration, see:
+#   * Official English Documentation: http://nginx.org/en/docs/
+#   * Official Russian Documentation: http://nginx.org/ru/docs/
+
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+# Load dynamic modules. See /usr/share/doc/nginx/README.dynamic.
+include /usr/share/nginx/modules/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main;
+
+    sendfile            on;
+    tcp_nopush          on;
+    tcp_nodelay         on;
+    keepalive_timeout   65;
+    types_hash_max_size 2048;
+
+    include             /etc/nginx/mime.types;
+    default_type        application/octet-stream;
+
+    # Load modular configuration files from the /etc/nginx/conf.d directory.
+    # See http://nginx.org/en/docs/ngx_core_module.html#include
+    # for more information.
+    include /etc/nginx/conf.d/*.conf;
+
+
+server {
+     listen 80;      # 代理端口,以后将通过此端口进行访问,不再通过8080端口
+    server_name ******;
+    root        /opt/lina;
+    index       index.html;
+    access_log /var/log/nginx/jumpserver-access.log main;
+    error_log  /var/log/nginx/jumpserver-error.log error;
+    client_max_body_size 100m;  # 录像及文件上传大小限制
+
+    location /ui/ {
+        try_files $uri / /index.html;
+        alias /opt/lina/;
+    }
+
+    location /luna/ {
+        try_files $uri / /index.html;
+        alias /opt/luna/;  # luna 路径, 如果修改安装目录, 此处需要修改
+    }
+
+    location /media/ {
+        add_header Content-Encoding gzip;
+        root /opt/jumpserver/data/;  # 录像位置, 如果修改安装目录, 此处需要修改
+    }
+
+    location /static/ {
+        root /opt/jumpserver/data/;  # 静态资源, 如果修改安装目录, 此处需要修改
+    }
+
+    location /koko/ {
+        proxy_pass       http://localhost:5000;
+        proxy_buffering off;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        access_log off;
+    }
+
+    location /guacamole/ {
+        proxy_pass       http://localhost:8081/;
+        proxy_buffering off;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $http_connection;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        access_log off;
+    }
+
+    location /ws/ {
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_pass http://localhost:8070;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    location /api/ {
+        proxy_pass http://localhost:8080;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /core/ {
+        proxy_pass http://localhost:8080;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location / {
+        rewrite ^/(.*)$ /ui/$1 last;
+    }
+}
+
+
+
+# Settings for a TLS enabled server.
+#
+#    server {
+#        listen       443 ssl http2 default_server;
+#        listen       [::]:443 ssl http2 default_server;
+#        server_name  _;
+#        root         /usr/share/nginx/html;
+#
+#        ssl_certificate "/etc/pki/nginx/server.crt";
+#        ssl_certificate_key "/etc/pki/nginx/private/server.key";
+#        ssl_session_cache shared:SSL:1m;
+#        ssl_session_timeout  10m;
+#        ssl_ciphers HIGH:!aNULL:!MD5;
+#        ssl_prefer_server_ciphers on;
+#
+#        # Load configuration files for the default server block.
+#        include /etc/nginx/default.d/*.conf;
+#
+#        location / {
+#        }
+#
+#        error_page 404 /404.html;
+#            location = /40x.html {
+#        }
+#
+#        error_page 500 502 503 504 /50x.html;
+#            location = /50x.html {
+#        }
+#    }
+
+}
+====
+
+
+
+
+5. 程序主体安装
+配置防火墙
+firewall-cmd --permanent --add-rich-rule="rule family="ipv4" source address="****** port protocol="tcp" port="8080" accept"
+firewall-cmd --permanent --add-rich-rule="rule family="ipv4" source address="******" port protocol="tcp" port="8070" accept"
+firewall-cmd --reload
+setsebool -P httpd_can_network_connect 1
+
+wget https://github.com/jumpserver/jumpserver/releases/download/v2.2.2/jumpserver-v2.2.2.tar.gz
+
+tar vxf jumpserver-v2.2.2.tar.gz
+mv jumpserver-v2.2.2 jumpserver
+
+
+安装 rpm 依赖包
+yum -y install $(cat /opt/jumpserver/requirements/rpm_requirements.txt)
+安装 python 依赖
+source /opt/py3/bin/activate
+pip install wheel
+pip install --upgrade pip setuptools
+pip install -r /opt/jumpserver/requirements/requirements.txt
+
+
+
+修改配置文件
+cd /opt/jumpserver
+cp config_example.yml config.yml
+
+
+SECRET_KEY=`cat /dev/urandom | tr -dc A-Za-z0-9 | head -c 50`
+echo "SECRET_KEY=$SECRET_KEY" >> ~/.bashrc
+BOOTSTRAP_TOKEN=`cat /dev/urandom | tr -dc A-Za-z0-9 | head -c 16`
+echo "BOOTSTRAP_TOKEN=$BOOTSTRAP_TOKEN" >> ~/.bashrc
+
+
+
+#echo $SECRET_KEY
+******
+
+#echo $BOOTSTRAP_TOKEN
+******
+
+
+
+sed -i "s/SECRET_KEY:/SECRET_KEY: $SECRET_KEY/g" /opt/jumpserver/config.yml
+sed -i "s/BOOTSTRAP_TOKEN:/BOOTSTRAP_TOKEN: $BOOTSTRAP_TOKEN/g" /opt/jumpserver/config.yml
+sed -i "s/# DEBUG: true/DEBUG: false/g" /opt/jumpserver/config.yml
+sed -i "s/# LOG_LEVEL: DEBUG/LOG_LEVEL: ERROR/g" /opt/jumpserver/config.yml
+sed -i "s/# SESSION_EXPIRE_AT_BROWSER_CLOSE: false/SESSION_EXPIRE_AT_BROWSER_CLOSE: true/g" /opt/jumpserver/config.yml
+
+
+echo -e "\033[31m 你的SECRET_KEY是 $SECRET_KEY \033[0m"
+echo -e "\033[31m 你的BOOTSTRAP_TOKEN是 $BOOTSTRAP_TOKEN \033[0m"
+
+
+===
+# SECURITY WARNING: keep the secret key used in production secret!
+# 加密秘钥 生产环境中请修改为随机字符串，请勿外泄, 可使用命令生成
+# cat /dev/urandom | tr -dc A-Za-z0-9 | head -c 49;echo
+SECRET_KEY: W5Ic3fMXNZ0p5RIy5DhJYJllppTfcfkW8Yuf94VBMfpcssbfu
+
+# SECURITY WARNING: keep the bootstrap token used in production secret!
+# 预共享Token coco和guacamole用来注册服务账号，不在使用原来的注册接受机制
+BOOTSTRAP_TOKEN: zxffNymGjP79j6BN
+
+# Development env open this, when error occur display the full process track, Production disable it
+# DEBUG 模式 开启DEBUG后遇到错误时可以看到更多日志
+DEBUG: false
+
+# DEBUG, INFO, WARNING, ERROR, CRITICAL can set. See https://docs.djangoproject.com/en/1.10/topics/logging/
+# 日志级别
+LOG_LEVEL: ERROR
+# LOG_DIR:
+
+# Session expiration setting, Default 24 hour, Also set expired on on browser close
+# 浏览器Session过期时间，默认24小时, 也可以设置浏览器关闭则过期
+# SESSION_COOKIE_AGE: 86400
+SESSION_EXPIRE_AT_BROWSER_CLOSE: true
+
+# Database setting, Support sqlite3, mysql, postgres ....
+# 数据库设置
+# See https://docs.djangoproject.com/en/1.10/ref/settings/#databases
+
+# SQLite setting:
+# 使用单文件sqlite数据库
+# DB_ENGINE: sqlite3
+# DB_NAME:
+
+# MySQL or postgres setting like:
+# 使用Mysql作为数据库
+DB_ENGINE: mysql
+DB_HOST: 192.168.100.10
+DB_PORT: 3306
+DB_USER: jumpserver
+DB_PASSWORD: weakPassword
+DB_NAME: jumpserver
+
+# When Django start it will bind this host and port
+# ./manage.py runserver 127.0.0.1:8080
+# 运行时绑定端口
+HTTP_BIND_HOST: 0.0.0.0
+HTTP_LISTEN_PORT: 8080
+WS_LISTEN_PORT: 8070
+
+# Use Redis as broker for celery and web socket
+# Redis配置
+REDIS_HOST: 192.168.100.20
+REDIS_PORT: 6379
+REDIS_PASSWORD: weakPassword
+# REDIS_DB_CELERY: 3
+# REDIS_DB_CACHE: 4
+
+# Use OpenID authorization
+# 使用OpenID 来进行认证设置
+# BASE_SITE_URL: http://localhost:8080
+# AUTH_OPENID: false  # True or False
+# AUTH_OPENID_SERVER_URL: https://openid-auth-server.com/
+# AUTH_OPENID_REALM_NAME: realm-name
+# AUTH_OPENID_CLIENT_ID: client-id
+# AUTH_OPENID_CLIENT_SECRET: client-secret
+# AUTH_OPENID_IGNORE_SSL_VERIFICATION: True
+# AUTH_OPENID_SHARE_SESSION: True
+
+# Use Radius authorization
+# 使用Radius来认证
+# AUTH_RADIUS: false
+# RADIUS_SERVER: localhost
+# RADIUS_PORT: 1812
+# RADIUS_SECRET:
+
+# CAS 配置
+# AUTH_CAS': False,
+# CAS_SERVER_URL': "http://host/cas/",
+# CAS_ROOT_PROXIED_AS': 'http://jumpserver-host:port',  
+# CAS_LOGOUT_COMPLETELY': True,
+# CAS_VERSION': 3,
+
+# LDAP/AD settings
+# LDAP 搜索分页数量
+# AUTH_LDAP_SEARCH_PAGED_SIZE: 1000
+#
+# 定时同步用户
+# 启用 / 禁用
+# AUTH_LDAP_SYNC_IS_PERIODIC: True
+# 同步间隔 (单位: 时) (优先）
+# AUTH_LDAP_SYNC_INTERVAL: 12
+# Crontab 表达式
+# AUTH_LDAP_SYNC_CRONTAB: * 6 * * *
+#
+# LDAP 用户登录时仅允许在用户列表中的用户执行 LDAP Server 认证
+# AUTH_LDAP_USER_LOGIN_ONLY_IN_USERS: False
+#
+# LDAP 认证时如果日志中出现以下信息将参数设置为 0 (详情参见：https://www.python-ldap.org/en/latest/faq.html)
+# In order to perform this operation a successful bind must be completed on the connection
+# AUTH_LDAP_OPTIONS_OPT_REFERRALS: -1
+
+# OTP settings
+# OTP/MFA 配置
+# OTP_VALID_WINDOW: 0
+# OTP_ISSUER_NAME: Jumpserver
+
+# Perm show single asset to ungrouped node
+# 是否把未授权节点资产放入到 未分组 节点中
+# PERM_SINGLE_ASSET_TO_UNGROUP_NODE: false
+#
+# 启用定时任务
+# PERIOD_TASK_ENABLE: True
+#
+# 启用二次复合认证配置
+# LOGIN_CONFIRM_ENABLE: False
+#
+# Windows 登录跳过手动输入密码
+WINDOWS_SKIP_ALL_MANUAL_PASSWORD: True
+=====
+
+
+
+
+挂载 NFS
+
+yum -y install nfs-utils
+showmount -e 192.168.100.99
+mount -t nfs 192.168.100.99:/data /opt/jumpserver/data
+
+192.168.100.99 为 nfs 服务器 ip, 请根据实际情况更改
+
+vi /etc/fstab
+
+192.168.100.99:/data /opt/jumpserver/data nfs defaults 0 0
+
+
+运行 core
+
+cd /opt/jumpserver
+./jms start -d
+
+
+
+
+
+Docker 部署 Guacamole 组件
+
+配置防火墙
+firewall-cmd --permanent --add-rich-rule="rule family="ipv4" source address="192.168.100.100" port protocol="tcp" port="8080" accept"
+
+yum install -y yum-utils device-mapper-persistent-data lvm2
+yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+yum install docker -y
+
+systemctl start docker
+systemctl enable docker
+
+# 查找centos镜像
+docker search jms_guacamole
+# 下载centos镜像
+docker pull docker.io/jumpserver/jms_guacamole:v2.2.2
+
+
+docker run --name jms_guacamole -d \
+  -p 127.0.0.1:8081:8080 \
+  -e JUMPSERVER_SERVER=http://<Jumpserver_url> \
+  -e BOOTSTRAP_TOKEN=<Jumpserver_BOOTSTRAP_TOKEN> \
+  -e GUACAMOLE_LOG_LEVEL=ERROR \
+  jumpserver/jms_guacamole:<Tag>
+<Jumpserver_url> 为 JumpServer 的 url 地址, <Jumpserver_BOOTSTRAP_TOKEN> 需要从 jumpserver/config.yml 里面获取, 保证一致, <Tag> 是版本
+
+
+
+docker run --name jms_guacamole -d \
+  -p 127.0.0.1:8081:8080 \
+  -e JUMPSERVER_SERVER=http://******:8080 \
+  -e BOOTSTRAP_TOKEN=****** \
+  -e GUACAMOLE_LOG_LEVEL=ERROR \
+  --restart=always \
+  jumpserver/jms_guacamole:v2.2.2
+
+
+
+docker run --name jms_guacamole -d \
+  -p 8081:8080 \
+  -e JUMPSERVER_KEY_DIR=/config/guacamole/key \
+  -e JUMPSERVER_SERVER=http://****** \
+  -e BOOTSTRAP_TOKEN=****** \
+  -e GUACAMOLE_LOG_LEVEL=ERROR \
+  --restart=always \
+  jumpserver/jms_guacamole:v2.2.2
+
+
+
+koko 部署
+
+配置防火墙
+firewall-cmd --permanent --add-rich-rule="rule family="ipv4" source address="192.168.100.100" port protocol="tcp" port="2222" accept"
+firewall-cmd --permanent --add-rich-rule="rule family="ipv4" source address="192.168.100.100" port protocol="tcp" port="5000" accept"
+firewall-cmd --reload
+
+192.168.100.100 为 Nginx 服务器 ip, 请根据实际情况修改
+
+
+
+# 查找centos镜像
+docker search jms_koko
+# 下载centos镜像
+docker pull docker.io/jumpserver/jms_koko:v2.2.2
+
+
+
+
+docker run --name jms_koko -d \
+  -p 2222:2222 \
+  -p 127.0.0.1:5000:5000 \
+  -e CORE_HOST=http://******:8080 \
+  -e BOOTSTRAP_TOKEN=****** \
+  -e LOG_LEVEL=ERROR \
+  -e REDIS_HOST=****** \
+  -e REDIS_PORT=6379 \
+  -e REDIS_PASSWORD=****** \
+  --privileged=true \
+  --restart=always \
+  jumpserver/jms_koko:v2.2.2
+
+
+
+
+docker run --name jms_koko -d \
+  -p 2222:2222 \
+  -p 5000:5000 \
+  -e CORE_HOST=http://****** \
+  -e BOOTSTRAP_TOKEN=****** \
+  -e LOG_LEVEL=ERROR \
+  -e REDIS_HOST=****** \
+  -e REDIS_PORT=6379 \
+  -e REDIS_PASSWORD=****** \
+  --privileged=true \
+  jumpserver/jms_koko:v2.2.2
+
+
+
+
+
+下载 Lina 组件
+
+cd /opt
+wget https://github.com/jumpserver/lina/releases/download/v2.2.2/lina-v2.2.2.tar.gz
+
+tar -xf lina-v2.2.2.tar.gz
+mv lina-v2.2.2 lina
+chown -R nginx:nginx lina
+11. 下载 Luna 组件
+
+cd /opt
+wget https://github.com/jumpserver/luna/releases/download/v2.2.2/luna-v2.2.2.tar.gz
+
+tar -xf luna-v2.2.2.tar.gz
+mv luna-v2.2.2 luna
+chown -R nginx:nginx luna
+
+
+
+=======================
+
+开启需要启动的服务:
+mariadb
+redis
+nginx
+
+jumpserver
+
+source /opt/py3/bin/activate
+./jmps start -d
+
+koko: docker
+或者./koko -d
+
+Gua : docker
+
+=====================================================
+
+最后可选
+NFS服务器部署
+
+配置防火墙(生产环境应该使用更严格的方式)
+
+firewall-cmd --add-service=nfs --permanent --zone=public
+firewall-cmd --add-service=mountd --permanent --zone=public
+firewall-cmd --add-service=rpc-bind --permanent --zone=public
+firewall-cmd --reload
+
+安装 nfs-server
+
+yum -y install nfs-utils rpcbind
+systemctl enable rpcbind nfs-server nfs-lock nfs-idmap
+systemctl start rpcbind nfs-server nfs-lock nfs-idmap
+4. 创建 NFS 共享目录
+
+mkdir /data
+此共享目录存放 JumpServer 的录像及任务结果
+
+5. 设置 NFS 访问权限
+
+vi /etc/exports
+
+/data 192.168.100.*(rw,sync,no_root_squash)
+/data 是刚才创建的将被共享的目录, 192.168.100.* 表示整个 192.168.100.* 的资产都有括号里面的权限
+也可以写具体的授权对象 /data 192.168.100.30(rw,sync,no_root_squash) 192.168.100.31(rw,sync,no_root_squash)
+
+6. 使 exports 生效
+
+exportfs -a
